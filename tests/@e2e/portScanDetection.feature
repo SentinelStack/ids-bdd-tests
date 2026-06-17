@@ -1,11 +1,11 @@
 @e2e
-Feature: Detecția unei scanări de porturi
+Feature: Port scan detection
 
-  # Scenariu care, în varianta completă, presupune declanșarea unei scanări reale (Nmap)
-  # împotriva rețelei monitorizate; aici se verifică propagarea alertei până în consolă.
+  # In the full variant this is driven by a real Nmap scan against the monitored network;
+  # here we verify the alert propagates from the edge to the console.
   Background:
-    Given operatorul este autentificat prin API
+    Given the operator is authenticated via API
 
-  Scenario: O alertă de scanare ajunge în consolă
-    When agentul raportează o anomalie
-    Then alerta apare în consolă în cel mult 30 secunde
+  Scenario: A scan alert reaches the console
+    When the agent reports an anomaly
+    Then the alert appears in the console within 30 seconds

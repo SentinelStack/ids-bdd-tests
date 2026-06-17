@@ -4,5 +4,9 @@ export class ReportsClient extends BaseClient {
   meta() { return this.get('/api/reports/meta'); }
   preview(query = '') { return this.get(`/api/reports/alerts/preview${query}`); }
   download(query = '') { return this.get(`/api/reports/alerts/download${query}`); }
+  volume(query = '') { return this.get(`/api/reports/volume${query}`); }
   curated() { return this.get('/api/reports/curated'); }
+  curatedDownload(name: string, query = '') {
+    return this.get(`/api/reports/curated/${encodeURIComponent(name)}/download${query}`);
+  }
 }

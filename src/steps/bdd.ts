@@ -8,18 +8,19 @@ import { DbWorld } from '../support/worlds/DbWorld';
 
 type Fixtures = {
   env: Env;
-  context: ScenarioContext;
+  scenario: ScenarioContext;
   api: ApiWorld;
   web: WebWorld;
   db: DbWorld;
 };
 
 // Fixturile joacă rolul „world"-urilor: sunt construite proaspăt pentru fiecare scenariu.
+// (`scenario` în loc de `context`, ca să nu se ciocnească cu fixtura `context: BrowserContext` din Playwright.)
 export const test = base.extend<Fixtures>({
   env: async ({}, use) => { await use(loadEnv()); },
-  context: async ({}, use) => { await use(new ScenarioContext()); },
-  api: async ({ env, context }, use) => { await use(new ApiWorld(env, context)); },
-  web: async ({ page, env, context }, use) => { await use(new WebWorld(page, env, context)); },
+  scenario: async ({}, use) => { await use(new ScenarioContext()); },
+  api: async ({ env, scenario }, use) => { await use(new ApiWorld(env, scenario)); },
+  web: async ({ page, env, scenario }, use) => { await use(new WebWorld(page, env, scenario)); },
   db: async ({ env }, use) => { await use(new DbWorld(env)); },
 });
 

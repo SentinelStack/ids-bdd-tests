@@ -1,9 +1,9 @@
 @web @console
-Feature: Autentificarea în consola AEGIS IDS
+Feature: Operator login to the AEGIS IDS console
 
-  # Notă: presupune un cont de test cu 2FA și secret TOTP cunoscut (OPERATOR_TOTP_SECRET).
-  Scenario: Operatorul se autentifică cu parolă și al doilea factor
-    Given operatorul deschide pagina de autentificare
-    When operatorul introduce credențialele
-    And operatorul introduce codul TOTP
-    Then tabloul de bord este afișat
+  # Note: assumes a test account with 2FA and a known TOTP secret (OPERATOR_TOTP_SECRET).
+  Scenario: Successful login with password and second factor
+    Given the operator opens the login page
+    When the operator submits valid credentials
+    And the operator submits the TOTP code
+    Then the dashboard is displayed

@@ -41,3 +41,14 @@ npm run report                 # raport HTML
 - `MONGODB_URI`, `CLICKHOUSE_URL` — opțional, pentru verificări în baze.
 
 > Selectorii din page-objects sunt orientativi (marcați `// TODO`) — ajustează-i la DOM-ul real al consolei.
+
+## Versiuni (important pentru `bddgen`)
+`playwright-bdd@7.5.0` necesită `playwright`/`@playwright/test` din seria **1.4x** (fixate la `1.47.2`).
+Dacă un `npm install` aduce un Playwright mai nou și `npx bddgen` dă eroare
+`Cannot find module .../playwright/lib/common/configLoader.js`, aliniază versiunile:
+păstrează Playwright `1.47.x`, **sau** urcă `playwright-bdd` la o versiune compatibilă cu Playwright-ul tău.
+Apoi: `npm install && npm test`.
+
+## Acoperire teste
+55 fișiere `.feature` · 132 de scenarii · pozitive (`requestResponse/`) + negative (`errorHandling/`)
+pentru fiecare endpoint al backendului, plus `@web` (consolă) și `@e2e` (flux complet).

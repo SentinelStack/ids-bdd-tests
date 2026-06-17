@@ -39,6 +39,6 @@ export class ApiWorld {
   authenticateOperator(token: string): void {
     this.context.set('operatorToken', token);
     const h = { authorization: `Bearer ${token}` };
-    [this.account, this.alerts, this.rules, this.reports, this.console].forEach((c) => c.setAuth(h));
+    [this.account, this.alerts, this.devices, this.traffic, this.forensics, this.rules, this.reports, this.console].forEach((c) => c.setAuth(h));
   }
 }

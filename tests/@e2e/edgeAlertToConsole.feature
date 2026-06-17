@@ -1,9 +1,9 @@
 @e2e
-Feature: Fluxul complet — alerta de la margine ajunge în consolă
+Feature: End-to-end flow - an edge alert reaches the console
 
   Background:
-    Given operatorul este autentificat prin API
+    Given the operator is authenticated via API
 
-  Scenario: O anomalie raportată de agent apare în consolă
-    When agentul raportează o anomalie
-    Then alerta apare în consolă în cel mult 20 secunde
+  Scenario: An anomaly reported by the agent appears in the console
+    When the agent reports an anomaly
+    Then the alert appears in the console within 20 seconds
