@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Typecheck & BDD validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Generate BDD specs (fail on unresolved steps)
+        run: |
+          set -o pipefail
+          OUT="$(npx bddgen 2>&1)"
+          echo "$OUT"
+          if echo "$OUT" | grep -qi "missing step"; then
+            echo "::error::Unresolved BDD step definitions found"
+            exit 1
+          fi
+
+      - name: List generated tests
+        run: npx playwright test --list
+
+# Running the suites (`npm test`) needs a live Sentinel backend (@api/@e2e) and
+# the web console + browsers (@web), so CI only does static validation here.
