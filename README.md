@@ -42,12 +42,22 @@ npm run report                 # raport HTML
 
 > Selectorii din page-objects sunt orientativi (marcați `// TODO`) — ajustează-i la DOM-ul real al consolei.
 
-## Versiuni (important pentru `bddgen`)
-`playwright-bdd@7.5.0` necesită `playwright`/`@playwright/test` din seria **1.4x** (fixate la `1.47.2`).
-Dacă un `npm install` aduce un Playwright mai nou și `npx bddgen` dă eroare
-`Cannot find module .../playwright/lib/common/configLoader.js`, aliniază versiunile:
-păstrează Playwright `1.47.x`, **sau** urcă `playwright-bdd` la o versiune compatibilă cu Playwright-ul tău.
-Apoi: `npm install && npm test`.
+## Rulare
+```bash
+npm install
+npx playwright install        # browsere (doar pentru testele @web/@e2e)
+npm run bddgen                # generează spec-urile Playwright din .feature
+npm test                      # bddgen + playwright test
+```
+
+## Versiuni
+Folosește versiuni **moderne**, aliniate (testat pe Node 25): `playwright`/`@playwright/test` `^1.61`
+și `playwright-bdd` `^9.1`. În playwright-bdd 9.x, `test` se extinde din `'playwright-bdd'`
+(vezi `src/steps/bdd.ts`), nu din `'@playwright/test'`.
+Erori posibile dacă versiunile nu se potrivesc: `Cannot find module .../playwright/lib/common/configLoader.js`
+(playwright-bdd prea vechi pentru Playwright-ul instalat) sau `ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX`
+(Playwright prea vechi pentru Node-ul instalat) — în ambele cazuri,
+`npm install -D @playwright/test@latest playwright@latest playwright-bdd@latest`.
 
 ## Acoperire teste
 57 fișiere `.feature` · 141 de scenarii · pozitive (`requestResponse/`) + negative (`errorHandling/`)

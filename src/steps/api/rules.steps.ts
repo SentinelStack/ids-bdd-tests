@@ -111,7 +111,7 @@ When(
 );
 
 When(
-  /^I update the captured rule(?: (rule\d+))? with the body "([^"]*)"$/,
+  /^I update the captured rule(?: (rule\d+))? with the body '([^']*)'$/,
   async ({ world }: { world: UnifiedWorld }, aliasToken: string | undefined, body: string) => {
     const alias = normalizeAlias(aliasToken, RulesContext.DEFAULT_RULE_ALIAS, 'rule');
     setState(world, await world.api.rulesClient.updateRaw(capturedRuleId(world, alias), JSON.parse(body)));

@@ -8,16 +8,15 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "baseUrl": ".",
     "paths": {
-      "@support/*": ["src/support/*"],
-      "@clients/*": ["src/clients/*"],
-      "@utils/*": ["src/utils/*"],
-      "@schemas/*": ["src/schemas/*"],
-      "@data/*": ["src/data/*"],
-      "@pages/*": ["src/pages/*"],
-      "src/*": ["src/*"],
-      "@/*": ["src/*"]
+      "@support/*": ["./src/support/*"],
+      "@clients/*": ["./src/clients/*"],
+      "@utils/*": ["./src/utils/*"],
+      "@schemas/*": ["./src/schemas/*"],
+      "@data/*": ["./src/data/*"],
+      "@pages/*": ["./src/pages/*"],
+      "src/*": ["./src/*"],
+      "@/*": ["./src/*"]
     }
   },
   "include": ["src", "scripts", "playwright.config.ts"]

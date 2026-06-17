@@ -12,7 +12,7 @@ Feature: Toggling rules error handling
   Scenario Outline: Toggling a rule with an invalid body is rejected
     Given the operator is authenticated via API
     And an existing rule is captured from the rule list
-    When I update the captured rule with the body "<body>"
+    When I update the captured rule with the body '<body>'
     Then the response status is 400
 
     Examples:

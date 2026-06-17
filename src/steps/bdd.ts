@@ -1,5 +1,4 @@
-import { test as base } from '@playwright/test';
-import { createBdd } from 'playwright-bdd';
+import { test as base, createBdd } from 'playwright-bdd';
 import { loadEnv } from '@support/env';
 import { UnifiedWorld } from '@support/worlds/UnifiedWorld';
 
