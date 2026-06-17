@@ -1,0 +1,5 @@
+{
+  "timeouts": { "actionMs": 10000, "expectMs": 15000, "pollMs": 30000 },
+  "polling": { "intervalMs": 500 },
+  "retries": 0
+}

@@ -1,0 +1,10 @@
+{
+  "name": "qa",
+  "apiBaseUrl": "https://qa-api.puk3p.online",
+  "webBaseUrl": "https://sentinel.puk3p.online",
+  "reportsPathPrefix": "/api/reports",
+  "agentApiKeyEnv": "AGENT_API_KEY",
+  "operator": { "usernameEnv": "OPERATOR_USER", "passwordEnv": "OPERATOR_PASS", "totpSecretEnv": "OPERATOR_TOTP_SECRET" },
+  "mongo": { "uriEnv": "MONGODB_URI", "database": "ids_platform" },
+  "clickhouse": { "urlEnv": "CLICKHOUSE_URL", "database": "sentinel" }
+}

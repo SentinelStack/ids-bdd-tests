@@ -1,0 +1,5 @@
+{
+  "headless": true,
+  "retries": 1,
+  "timeouts": { "expectMs": 30000, "pollMs": 60000 }
+}
