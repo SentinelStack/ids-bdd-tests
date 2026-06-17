@@ -8,16 +8,10 @@ import { HttpResponse } from 'src/clients/http';
 import { HeaderMap } from 'src/clients/BaseClient';
 import { ApiAlertResponse } from 'src/schemas/zod/alerts';
 
-// ==============================================================================
-// ALERTS — pași în modelul „world / state / context per domeniu"
-// ==============================================================================
-
-// Override-uri de headere pentru cazurile negative (forțează 401 / cheie invalidă).
 const NO_API_KEY: HeaderMap = { 'x-api-key': '' };
 const NO_AUTH: HeaderMap = { 'x-api-key': '', authorization: '' };
 const UNKNOWN_ID = '00000000-0000-0000-0000-000000000000';
 
-/** Corp valid de alertă (de pildă o scanare de porturi), randomizat cu faker. */
 function validAlertPayload(overrides: Record<string, unknown> = {}) {
   return {
     alertId: `alr-${faker.string.alphanumeric(10).toLowerCase()}`,
@@ -34,19 +28,16 @@ function validAlertPayload(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** Publică ultimul răspuns în starea partajată (cod de stare + corp). */
 function setState(world: UnifiedWorld, res: HttpResponse): void {
   world.api.state.statusCode = res.statusCode;
   world.api.state.body = res.body;
 }
 
-/** Id-ul alertei ingerate anterior pentru un alias. */
 function ingestedId(world: UnifiedWorld, alias: string): string {
   const body = world.api.alertCtx.getIngest(alias).apiRes.body as ApiAlertResponse;
   return body.data?.alertId ?? 'AlertIdMissing';
 }
 
-// ── Ingestie agent — POST /api/alerts ───────────────────────────────────────
 When(
   /^the agent ingests a new alert(?: (alert\d+))?$/,
   async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
@@ -97,7 +88,6 @@ When(/^the agent ingests an alert with an invalid API key$/, async ({ world }: {
   setState(world, await world.api.alertsClient.create(validAlertPayload(), { 'x-api-key': 'not-a-real-key' }));
 });
 
-// ── Listare / filtrare operator — GET /api/alerts ───────────────────────────
 When(/^the operator lists the alerts$/, async ({ world }: { world: UnifiedWorld }) => {
   setState(world, await world.api.alertsClient.list());
 });
@@ -114,7 +104,6 @@ When(/^the operator lists the alerts without authentication$/, async ({ world }:
   setState(world, await world.api.alertsClient.list('', NO_AUTH));
 });
 
-// ── Confirmare operator — POST /api/alerts/{id}/acknowledge ──────────────────
 When(
   /^the operator acknowledges the ingested alert(?: (alert\d+))?$/,
   async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
@@ -143,7 +132,6 @@ When(/^the operator acknowledges an unknown alert without authentication$/, asyn
   setState(world, await world.api.alertsClient.acknowledge(UNKNOWN_ID, NO_AUTH));
 });
 
-// ── Aserții specifice domeniului ────────────────────────────────────────────
 Then(/^the alert response contains an alert id$/, async ({ world }: { world: UnifiedWorld }) => {
   const body = world.api.state.body as ApiAlertResponse;
   expect(body.data?.alertId, `aștept data.alertId, am: ${JSON.stringify(body)}`).toBeTruthy();

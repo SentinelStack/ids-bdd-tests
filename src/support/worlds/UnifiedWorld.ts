@@ -4,7 +4,6 @@ import { ApiWorld } from '@support/worlds/ApiWorld';
 import { WebWorld } from '@support/worlds/WebWorld';
 import { DbWorld } from '@support/worlds/DbWorld';
 
-/** World-ul unic injectat în fiecare pas: agregă API, web și baza de date. */
 export class UnifiedWorld {
   readonly api: ApiWorld;
   readonly web: WebWorld;

@@ -1,7 +1,6 @@
 import { AliasResponseStore } from '@support/context/AliasResponseStore';
 import { HttpResponse } from 'src/clients/http';
 
-/** Contextul domeniului ALERTS: ține minte alertele ingerate de agent, pe alias. */
 export class AlertContext extends AliasResponseStore {
   static readonly DEFAULT_ALERT_ALIAS = 'alert1';
 

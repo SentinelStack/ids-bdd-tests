@@ -2,7 +2,6 @@ import { Given } from 'src/steps/bdd';
 import { UnifiedWorld } from '@support/worlds/UnifiedWorld';
 import { totpCode } from 'src/utils/auth/totp';
 
-/** Autentifică operatorul (parolă, apoi TOTP dacă e cerut) pentru endpoint-urile de operator. */
 Given('the operator is authenticated via API', async ({ world }: { world: UnifiedWorld }) => {
   const api = world.api;
   const { username, password, totpSecret } = api.env.operator;

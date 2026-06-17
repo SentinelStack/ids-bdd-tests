@@ -7,22 +7,13 @@ import { HttpResponse } from 'src/clients/http';
 import { HeaderMap } from 'src/clients/BaseClient';
 import { ApiReportResponse } from 'src/schemas/zod/reports';
 
-// ==============================================================================
-// REPORTS — pași în modelul „world / state / context per domeniu"
-// ==============================================================================
-// Toate endpoint-urile de rapoarte sunt de operator (Bearer atașat prin Background).
-// Pașii negativi de autentificare suprascriu headerul authorization ca să forțeze 401.
-
-// Override-uri de headere pentru cazurile negative (golesc autentificarea de operator).
 const NO_AUTH: HeaderMap = { authorization: '', 'x-api-key': '' };
 
-/** Publică ultimul răspuns în starea partajată (cod de stare + corp). */
 function setState(world: UnifiedWorld, res: HttpResponse): void {
   world.api.state.statusCode = res.statusCode;
   world.api.state.body = res.body;
 }
 
-/** Numele primului raport din catalogul curat memorat pentru un alias. */
 function firstCuratedName(world: UnifiedWorld, alias: string): string {
   const body = world.api.reportsCtx.getCatalog(alias).apiRes.body as ApiReportResponse;
   const data = (body as { data?: unknown }).data;
@@ -36,7 +27,6 @@ function firstCuratedName(world: UnifiedWorld, alias: string): string {
   return String(name);
 }
 
-// ── Filter metadata ─────────────────────────────────────────────────────────
 When(/^the report filter metadata is requested$/, async ({ world }: { world: UnifiedWorld }) => {
   const res = await world.api.reportsClient.meta();
   setState(world, res);
@@ -47,7 +37,6 @@ When(/^the report filter metadata is requested without authentication$/, async (
   setState(world, await world.api.reportsClient.meta(NO_AUTH));
 });
 
-// ── Alerts preview ──────────────────────────────────────────────────────────
 When(/^the alerts report preview is requested$/, async ({ world }: { world: UnifiedWorld }) => {
   const res = await world.api.reportsClient.preview();
   setState(world, res);
@@ -64,7 +53,6 @@ When(/^the alerts report preview is requested without authentication$/, async ({
   setState(world, await world.api.reportsClient.preview('', NO_AUTH));
 });
 
-// ── Alerts download ─────────────────────────────────────────────────────────
 When(/^the alerts report download is requested in "([^"]*)" format$/, async ({ world }: { world: UnifiedWorld }, format: string) => {
   const res = await world.api.reportsClient.download(`?format=${encodeURIComponent(format)}`);
   setState(world, res);
@@ -81,7 +69,6 @@ When(/^the alerts report download is requested without authentication$/, async (
   setState(world, await world.api.reportsClient.download('', NO_AUTH));
 });
 
-// ── Volume histogram ────────────────────────────────────────────────────────
 When(/^the report volume histogram is requested$/, async ({ world }: { world: UnifiedWorld }) => {
   const res = await world.api.reportsClient.volume();
   setState(world, res);
@@ -92,7 +79,6 @@ When(/^the report volume histogram is requested without authentication$/, async 
   setState(world, await world.api.reportsClient.volume('', NO_AUTH));
 });
 
-// ── Curated catalog + curated download ──────────────────────────────────────
 When(
   /^the curated reports catalog is requested(?: as (report\d+))?$/,
   async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
@@ -125,7 +111,6 @@ When(/^the curated report "([^"]*)" is downloaded$/, async ({ world }: { world: 
   world.api.log.info({ name, statusCode: res.statusCode }, 'Descărcare raport curat după nume');
 });
 
-// ── Aserții specifice domeniului ────────────────────────────────────────────
 Then(/^the report response data is a list$/, async ({ world }: { world: UnifiedWorld }) => {
   const data = (world.api.state.body as { data?: unknown }).data;
   const list = Array.isArray(data)

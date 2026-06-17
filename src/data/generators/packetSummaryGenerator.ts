@@ -1,7 +1,6 @@
 import { shortId } from 'src/data/generators/idGenerator';
 import { nowIso } from 'src/data/generators/timestampGenerator';
 
-/** Builds a representative captured-packet summary (metadata only, no PCAP payload). */
 export function newPacketSummary(overrides: Record<string, unknown> = {}) {
   return {
     packetId: shortId('pkt'),

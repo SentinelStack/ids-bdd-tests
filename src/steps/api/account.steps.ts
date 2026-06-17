@@ -9,31 +9,22 @@ import { HeaderMap } from 'src/clients/BaseClient';
 import { ApiAccountResponse } from 'src/schemas/zod/account';
 import { totpCode } from 'src/utils/auth/totp';
 
-// ==============================================================================
-// ACCOUNT / AUTH — pași în modelul „world / state / context per domeniu"
-// ==============================================================================
-
-// Override-uri de headere pentru cazurile negative (forțează 401 fără jeton de operator).
 const NO_AUTH: HeaderMap = { 'x-api-key': '', authorization: '' };
 
-/** Publică ultimul răspuns în starea partajată (cod de stare + corp). */
 function setState(world: UnifiedWorld, res: HttpResponse): void {
   world.api.state.statusCode = res.statusCode;
   world.api.state.body = res.body;
 }
 
-/** Citește plicul `data` al răspunsului de cont stocat în starea curentă. */
 function accountData(world: UnifiedWorld): NonNullable<ApiAccountResponse['data']> {
   return ((world.api.state.body as ApiAccountResponse).data ?? {}) as NonNullable<ApiAccountResponse['data']>;
 }
 
-/** Jetonul de provocare 2FA reținut de la un login anterior, pe alias. */
 function challengeToken(world: UnifiedWorld, alias: string): string {
   const body = world.api.accountCtx.getLogin(alias).apiRes.body as ApiAccountResponse;
   return body.data?.mfaToken ?? 'MfaTokenMissing';
 }
 
-// Lasă feature-ul să exprime corpuri brute / malformate (câmpuri lipsă, obiect gol).
 function parseJsonBody(body: string): unknown {
   try {
     return JSON.parse(body);
@@ -42,7 +33,6 @@ function parseJsonBody(body: string): unknown {
   }
 }
 
-// ── /api/auth/login ─────────────────────────────────────────────────────────
 When(
   /^the operator logs in with the seeded credentials(?: as (account\d+))?$/,
   async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
@@ -81,7 +71,6 @@ Then(/^the login response requires a second factor$/, async ({ world }: { world:
   expect(typeof data.mfaToken).toBe('string');
 });
 
-// ── /api/auth/mfa ─────────────────────────────────────────────────────────────
 Given(
   /^the operator has started a login that requires a second factor(?: as (account\d+))?$/,
   async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
@@ -131,7 +120,6 @@ Then(/^the mfa response carries a token$/, async ({ world }: { world: UnifiedWor
   expect(typeof data.token === 'string' && data.token.length > 0, `aștept un token în răspunsul mfa, am: ${JSON.stringify(data)}`).toBe(true);
 });
 
-// ── /api/auth/google ──────────────────────────────────────────────────────────
 When(
   /^the operator signs in with Google id token "([^"]*)"$/,
   async ({ world }: { world: UnifiedWorld }, idToken: string) => {
@@ -146,7 +134,6 @@ When(
   },
 );
 
-// ── GET /api/account (me) ─────────────────────────────────────────────────────
 When(/^the operator account is requested$/, async ({ world }: { world: UnifiedWorld }) => {
   setState(world, await world.api.accountClient.me());
 });
@@ -160,7 +147,6 @@ Then(/^the account response carries the username and account id$/, async ({ worl
   expect(typeof data.username === 'string' && typeof data.accountId === 'string', `aștept username și accountId, am: ${JSON.stringify(data)}`).toBe(true);
 });
 
-// ── PUT /api/account/profile ──────────────────────────────────────────────────
 When(
   /^the operator updates the profile full name to "([^"]*)"$/,
   async ({ world }: { world: UnifiedWorld }, fullName: string) => {
@@ -193,7 +179,6 @@ When(
   },
 );
 
-// ── POST /api/account/password ────────────────────────────────────────────────
 When(
   /^the operator changes the password from "([^"]*)" to "([^"]*)"$/,
   async ({ world }: { world: UnifiedWorld }, current: string, next: string) => {
@@ -208,8 +193,6 @@ When(
   },
 );
 
-// Round-trip pozitiv: schimbă parola seed cu una nouă tare, apoi o restaurează,
-// ca operatorul să rămână utilizabil pentru celelalte scenarii.
 When(/^the operator rotates the password and restores it$/, async ({ world }: { world: UnifiedWorld }) => {
   const original = world.api.env.operator.password;
   const rotated = `${original}x9`;

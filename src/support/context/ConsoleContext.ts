@@ -1,7 +1,6 @@
 import { AliasResponseStore } from '@support/context/AliasResponseStore';
 import { HttpResponse } from 'src/clients/http';
 
-/** Contextul domeniului CONSOLE: ține minte vizualizările pre-calculate cerute, pe alias. */
 export class ConsoleContext extends AliasResponseStore {
   static readonly DEFAULT_CONSOLE_ALIAS = 'console1';
 

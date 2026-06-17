@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { apiEnvelope } from 'src/schemas/zod/common';
 
-/** Un singur element de alertă (ingestie / element de pagină). */
 export const AlertDataSchema = z
   .object({
     alertId: z.string(),
@@ -18,7 +17,6 @@ export const AlertDataSchema = z
 export const AlertResponseSchema = apiEnvelope(AlertDataSchema);
 export type ApiAlertResponse = z.infer<typeof AlertResponseSchema>;
 
-/** Plicul paginat al listării de alerte: data.content este un tablou de alerte. */
 export const AlertPageDataSchema = z
   .object({ content: z.array(AlertDataSchema), totalElements: z.number(), size: z.number() })
   .partial()

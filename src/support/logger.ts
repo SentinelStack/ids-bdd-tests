@@ -12,7 +12,6 @@ function emit(level: string, a: LogObject | string, msg?: string): void {
   else console.log(`[${level}] ${msg ?? ''}`.trim(), JSON.stringify(a));
 }
 
-/** Logger structurat partajat de toate world-urile. */
 export const logger: Logger = {
   info: (a, m) => emit('INFO', a, m),
   warn: (a, m) => emit('WARN', a, m),

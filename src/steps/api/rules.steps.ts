@@ -7,31 +7,21 @@ import { HttpResponse } from 'src/clients/http';
 import { HeaderMap } from 'src/clients/BaseClient';
 import { ApiRuleResponse, ApiRuleListResponse } from 'src/schemas/zod/rules';
 
-// ==============================================================================
-// RULES — pași în modelul „world / state / context per domeniu"
-// ==============================================================================
-
-// Override-uri de headere pentru cazurile negative (forțează 401). Regulile sunt
-// endpoint de operator (Bearer), deci anulăm doar antetul de autentificare.
 const NO_AUTH: HeaderMap = { authorization: '' };
 const UNKNOWN_RULE_ID = 'EDGE-RULE-DOES-NOT-EXIST-999';
 
-/** O singură regulă din plicul listei. */
 interface RuleSummary { ruleId: string; name?: string; category?: string; enabled?: boolean }
 
-/** Extrage tabloul de reguli din data.content al ultimului răspuns. */
 function ruleListFrom(body: unknown): RuleSummary[] {
   const data = (body as ApiRuleListResponse)?.data;
   return Array.isArray(data?.content) ? (data!.content as RuleSummary[]) : [];
 }
 
-/** Publică ultimul răspuns în starea partajată (cod de stare + corp). */
 function setState(world: UnifiedWorld, res: HttpResponse): void {
   world.api.state.statusCode = res.statusCode;
   world.api.state.body = res.body;
 }
 
-/** Id-ul regulii capturate anterior din lista stocată pentru un alias. */
 function capturedRuleId(world: UnifiedWorld, alias: string): string {
   const body = world.api.rulesCtx.getList(alias).apiRes.body;
   const first = ruleListFrom(body)[0];
@@ -39,13 +29,11 @@ function capturedRuleId(world: UnifiedWorld, alias: string): string {
   return first.ruleId;
 }
 
-/** Starea curentă „enabled" a primei reguli capturate pentru un alias. */
 function capturedRuleEnabled(world: UnifiedWorld, alias: string): boolean {
   const body = world.api.rulesCtx.getList(alias).apiRes.body;
   return ruleListFrom(body)[0]?.enabled === true;
 }
 
-// ── Setup ─────────────────────────────────────────────────────────────────────
 Given(
   /^an existing rule is captured from the rule list(?: as (rule\d+))?$/,
   async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
@@ -57,7 +45,6 @@ Given(
   },
 );
 
-// ── List (operator) ─────────────────────────────────────────────────────────
 When(/^I list the rules as the operator$/, async ({ world }: { world: UnifiedWorld }) => {
   setState(world, await world.api.rulesClient.list());
 });
@@ -82,7 +69,6 @@ When(/^I list the rules without authentication$/, async ({ world }: { world: Uni
   setState(world, await world.api.rulesClient.list('', NO_AUTH));
 });
 
-// ── Toggle (operator) ─────────────────────────────────────────────────────────
 When(
   /^I toggle the captured rule(?: (rule\d+))? to enabled "([^"]*)"$/,
   async ({ world }: { world: UnifiedWorld }, aliasToken: string | undefined, enabled: string) => {
@@ -126,7 +112,6 @@ When(
   },
 );
 
-// ── Aserții specifice domeniului ──────────────────────────────────────────────
 Then(/^the rules response contains a list of rules$/, async ({ world }: { world: UnifiedWorld }) => {
   const rules = ruleListFrom(world.api.state.body);
   expect(Array.isArray(rules), `aștept un tablou de reguli, am: ${JSON.stringify(world.api.state.body)}`).toBe(true);

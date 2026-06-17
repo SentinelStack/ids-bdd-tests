@@ -1,7 +1,6 @@
 import { MongoClient, Db } from 'mongodb';
 import { BaseDatabaseClient } from 'src/clients/database/BaseDatabaseClient';
 
-/** Acces la baza operațională (ids_platform) pentru pregătire/verificare de date de test. */
 export class MongoDbClient implements BaseDatabaseClient {
   private client?: MongoClient;
   private db?: Db;

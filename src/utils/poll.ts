@@ -1,4 +1,4 @@
-/** Reîncearcă `fn` până când `predicate` e adevărat sau expiră timpul. */
+
 export async function pollUntil<T>(
   fn: () => Promise<T>,
   predicate: (value: T) => boolean,

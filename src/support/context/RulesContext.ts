@@ -1,7 +1,6 @@
 import { AliasResponseStore } from '@support/context/AliasResponseStore';
 import { HttpResponse } from 'src/clients/http';
 
-/** Contextul domeniului RULES: ține minte răspunsul listei de reguli, pe alias. */
 export class RulesContext extends AliasResponseStore {
   static readonly DEFAULT_RULE_ALIAS = 'rule1';
 

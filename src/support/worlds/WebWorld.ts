@@ -7,7 +7,6 @@ import { RulesPage } from 'src/pages/console/RulesPage';
 import { ReportsPage } from 'src/pages/console/ReportsPage';
 import { SideBar } from 'src/pages/console/components/SideBar';
 
-/** „World"-ul web: page-objects ale consolei AEGIS IDS. */
 export class WebWorld {
   readonly login: LoginPage;
   readonly dashboard: DashboardPage;

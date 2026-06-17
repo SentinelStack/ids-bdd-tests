@@ -18,10 +18,8 @@ import { ForensicsClient } from 'src/clients/api/ForensicsClient';
 import { ReportsClient } from 'src/clients/api/ReportsClient';
 import { ConsoleClient } from 'src/clients/api/ConsoleClient';
 
-/** Ultimul răspuns API expus pașilor: cod de stare + corp. */
 export interface ApiState { statusCode: number; body: unknown }
 
-/** „World"-ul de API: clienți per domeniu, contexte per domeniu, starea curentă și logger. */
 export class ApiWorld {
   readonly devicesClient: DevicesClient;
   readonly alertsClient: AlertsClient;
@@ -32,7 +30,6 @@ export class ApiWorld {
   readonly reportsClient: ReportsClient;
   readonly consoleClient: ConsoleClient;
 
-  // Contexte per domeniu (înlănțuiesc răspunsuri între pași, pe alias).
   readonly deviceCtx = new DeviceContext();
   readonly alertCtx = new AlertContext();
   readonly trafficCtx = new TrafficContext();
@@ -42,7 +39,6 @@ export class ApiWorld {
   readonly accountCtx = new AccountContext();
   readonly consoleCtx = new ConsoleContext();
 
-  // Stocare ad-hoc între pași (id-uri, payload-uri intermediare etc.).
   readonly context = new ScenarioContext();
 
   readonly log: Logger = logger;
@@ -62,7 +58,6 @@ export class ApiWorld {
     this.consoleClient = new ConsoleClient(base);
   }
 
-  /** Atașează jetonul de operator pe clienții cu endpoint-uri de operator. */
   authenticateOperator(token: string): void {
     this.operatorToken = token;
     const h = { authorization: `Bearer ${token}` };

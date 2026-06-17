@@ -2,12 +2,10 @@ import { httpRequest, HttpResponse } from 'src/clients/http';
 
 export type HeaderMap = Record<string, string>;
 
-/** Client de bază: gazdă + anteturi implicite + anteturi de autentificare (setabile la rulare). */
 export class BaseClient {
   protected authHeaders: HeaderMap = {};
   constructor(protected readonly baseUrl: string, protected readonly defaultHeaders: HeaderMap = {}) {}
 
-  /** Atașează un antet de autentificare (de ex. Bearer de operator). */
   setAuth(headers: HeaderMap): this { this.authHeaders = headers; return this; }
 
   protected headers(extra: HeaderMap = {}): HeaderMap {

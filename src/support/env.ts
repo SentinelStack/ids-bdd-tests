@@ -19,7 +19,6 @@ export interface Env {
 
 let cached: Env | undefined;
 
-/** Încarcă mediul ales (ENV=qa|qa-local|demo), peste defaults + ci, cu secrete din variabile de mediu. */
 export function loadEnv(): Env {
   if (cached) return cached;
   const envName = process.env.ENV ?? 'qa-local';

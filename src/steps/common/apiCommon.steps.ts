@@ -2,7 +2,6 @@ import { expect } from '@playwright/test';
 import { Then } from 'src/steps/bdd';
 import { UnifiedWorld } from '@support/worlds/UnifiedWorld';
 
-/** Aserțiile partajate citesc ultimul răspuns din world.api.state. */
 Then('the response status is {int}', async ({ world }: { world: UnifiedWorld }, status: number) => {
   expect(world.api.state.statusCode, `corp: ${JSON.stringify(world.api.state.body)}`).toBe(status);
 });

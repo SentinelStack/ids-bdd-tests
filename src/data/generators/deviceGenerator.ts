@@ -1,5 +1,5 @@
 import { shortId } from 'src/data/generators/idGenerator';
-/** Construiește un corp valid de înregistrare de dispozitiv. */
+
 export function newDevice(overrides: Record<string, unknown> = {}) {
   return { name: `router-${shortId()}`, ipAddress: '192.0.2.10', firmware: '23.05.3', model: 'test-router', ...overrides };
 }

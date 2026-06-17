@@ -7,21 +7,13 @@ import { HttpResponse } from 'src/clients/http';
 import { HeaderMap } from 'src/clients/BaseClient';
 import { ApiConsoleResponse } from 'src/schemas/zod/console';
 
-// ==============================================================================
-// CONSOLE — vizualizări pre-calculate pentru operator, în modelul
-// „world / state / context per domeniu". Index public + dashboard/incidents (operator).
-// ==============================================================================
-
-// Override-uri de headere pentru cazurile negative (forțează 401 fără Bearer-ul de operator).
 const NO_AUTH: HeaderMap = { 'x-api-key': '', authorization: '' };
 
-/** Publică ultimul răspuns în starea partajată (cod de stare + corp). */
 function setState(world: UnifiedWorld, res: HttpResponse): void {
   world.api.state.statusCode = res.statusCode;
   world.api.state.body = res.body;
 }
 
-// ── Index hypermedia (public) ───────────────────────────────────────────────
 When(
   /^the console index is requested(?: as (console\d+))?$/,
   async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
@@ -37,7 +29,6 @@ When(/^the console index is requested without authentication$/, async ({ world }
   setState(world, await world.api.consoleClient.index(NO_AUTH));
 });
 
-// ── Dashboard (operator) ────────────────────────────────────────────────────
 When(
   /^the console dashboard is requested(?: as (console\d+))?$/,
   async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
@@ -53,7 +44,6 @@ When(/^the console dashboard is requested without authentication$/, async ({ wor
   setState(world, await world.api.consoleClient.dashboard(NO_AUTH));
 });
 
-// ── Incidents (operator, cu filtre) ─────────────────────────────────────────
 When(/^the console incidents view is requested$/, async ({ world }: { world: UnifiedWorld }) => {
   setState(world, await world.api.consoleClient.incidents());
 });
@@ -83,7 +73,6 @@ When(
   },
 );
 
-// ── Aserții specifice domeniului ────────────────────────────────────────────
 Then(/^the console index exposes navigation links$/, async ({ world }: { world: UnifiedWorld }) => {
   const body = world.api.state.body as ApiConsoleResponse;
   const data = (body.data ?? body) as Record<string, unknown>;
@@ -98,7 +87,6 @@ Then(/^the console dashboard payload is present$/, async ({ world }: { world: Un
   expect(body.data).not.toBeNull();
 });
 
-// Precondiție de înlănțuire opțională: o vizualizare a fost deja cerută pentru un alias.
 Given(
   /^the console dashboard has been requested(?: as (console\d+))?$/,
   async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {

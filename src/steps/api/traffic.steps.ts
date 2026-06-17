@@ -8,18 +8,10 @@ import { HttpResponse } from 'src/clients/http';
 import { HeaderMap } from 'src/clients/BaseClient';
 import { ApiTrafficStatsResponse } from 'src/schemas/zod/traffic';
 
-// ==============================================================================
-// TRAFFIC — pași în modelul „world / state / context per domeniu"
-//   POST /api/traffic/stats  (agent, cheia API)   -> 201
-//   GET  /api/traffic        (operator, Bearer)   -> 200
-// ==============================================================================
-
-// Override-uri de headere pentru cazurile negative (forțează 401 / cheie invalidă).
 const NO_API_KEY: HeaderMap = { 'x-api-key': '' };
 const BAD_API_KEY: HeaderMap = { 'x-api-key': 'not-a-real-key' };
 const NO_AUTH: HeaderMap = { 'x-api-key': '', authorization: '' };
 
-/** Fereastră validă de statistici de trafic, randomizată cu faker. */
 function validTrafficStats(overrides: Record<string, unknown> = {}) {
   const tcp = faker.number.int({ min: 100, max: 800 });
   const udp = faker.number.int({ min: 50, max: 400 });
@@ -34,13 +26,11 @@ function validTrafficStats(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** Publică ultimul răspuns în starea partajată (cod de stare + corp). */
 function setState(world: UnifiedWorld, res: HttpResponse): void {
   world.api.state.statusCode = res.statusCode;
   world.api.state.body = res.body;
 }
 
-// ── POST /api/traffic/stats (agent ingest) ─────────────────────────────────────
 When(
   /^the agent submits valid traffic statistics(?: (traffic\d+))?$/,
   async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
@@ -89,7 +79,6 @@ When(/^the agent submits traffic statistics with an invalid API key$/, async ({ 
   setState(world, await world.api.trafficClient.stats(validTrafficStats(), BAD_API_KEY));
 });
 
-// ── GET /api/traffic (operator overview/list) ──────────────────────────────────
 When(/^the operator requests the traffic overview$/, async ({ world }: { world: UnifiedWorld }) => {
   setState(world, await world.api.trafficClient.list());
 });
@@ -114,7 +103,6 @@ When(/^the operator requests the traffic overview without authentication$/, asyn
   setState(world, await world.api.trafficClient.list('', NO_AUTH));
 });
 
-// ── Aserții specifice domeniului ──────────────────────────────────────────────
 Then(/^the traffic response carries an identifier$/, async ({ world }: { world: UnifiedWorld }) => {
   const body = world.api.state.body as ApiTrafficStatsResponse;
   const id = body.data?.id;

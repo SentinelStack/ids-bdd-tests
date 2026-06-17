@@ -1,4 +1,4 @@
-/** Stocare cheie-valoare partajată între pașii unui scenariu (alias-uri, ultimul răspuns, id-uri create). */
+
 export class ScenarioContext {
   private readonly store = new Map<string, unknown>();
   set<T>(key: string, value: T): void { this.store.set(key, value); }

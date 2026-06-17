@@ -1,12 +1,7 @@
 import { HttpResponse } from 'src/clients/http';
 
-/** Pereche stocată în context: răspunsul API al unei operații anterioare. */
 export interface StoredApiRes { apiRes: HttpResponse }
 
-/**
- * Stochează răspunsuri API pe (alias, etichetă), ca pașii ulteriori să se poată
- * înlănțui după o operație anterioară (ex. „dispozitivul înregistrat la device2").
- */
 export class AliasResponseStore {
   private readonly store = new Map<string, HttpResponse>();
 

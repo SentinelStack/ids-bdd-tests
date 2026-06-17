@@ -1,7 +1,6 @@
 import { AliasResponseStore } from '@support/context/AliasResponseStore';
 import { HttpResponse } from 'src/clients/http';
 
-/** Contextul domeniului ACCOUNT: ține minte autentificările (login/mfa/google), pe alias. */
 export class AccountContext extends AliasResponseStore {
   static readonly DEFAULT_ACCOUNT_ALIAS = 'account1';
 
