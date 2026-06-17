@@ -8,6 +8,7 @@
     "node": ">=20"
   },
   "scripts": {
+    "postinstall": "node scripts/ensure-pw-compat.mjs",
     "bddgen": "bddgen",
     "test": "bddgen && playwright test",
     "test:api": "bddgen && playwright test --grep @api",
