@@ -1,4 +1,4 @@
-import { httpRequest, HttpResponse } from './http';
+import { httpRequest, HttpResponse } from 'src/clients/http';
 
 export type HeaderMap = Record<string, string>;
 

@@ -1,5 +1,5 @@
-import { BaseDatabaseClient } from './BaseDatabaseClient';
-import { httpRequest } from '../http';
+import { BaseDatabaseClient } from 'src/clients/database/BaseDatabaseClient';
+import { httpRequest } from 'src/clients/http';
 
 /** Interogări de verificare pe magazinul analitic (ClickHouse), prin interfața HTTP. */
 export class ClickHouseDbClient implements BaseDatabaseClient {

@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test';
-import { HttpResponse } from '../../clients/http';
+import { HttpResponse } from 'src/clients/http';
 
 export function expectStatus(res: HttpResponse, expected: number): void {
   expect(res.status, `aștept status ${expected}, am primit ${res.status}: ${res.raw}`).toBe(expected);

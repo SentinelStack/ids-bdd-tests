@@ -1,118 +1,149 @@
-import { Given, When, Then } from '../bdd';
-import { expectStatus } from '../../utils/api/assertionUtils';
+import { expect } from '@playwright/test';
+import { When, Then } from 'src/steps/bdd';
+import { UnifiedWorld } from '@support/worlds/UnifiedWorld';
+import { ReportsContext } from '@support/context/ReportsContext';
+import { normalizeAlias } from 'src/utils/context/contextUtils';
+import { HttpResponse } from 'src/clients/http';
+import { HeaderMap } from 'src/clients/BaseClient';
+import { ApiReportResponse } from 'src/schemas/zod/reports';
 
-/**
- * Steps for the REPORTS domain (/api/reports, operator).
- * All phrases are prefixed with the "report"/"reports" noun so they never
- * collide with other domains. The four common phrases
- * ("the response status is {int}", "the response indicates success",
- * "the response message contains {string}", "the operator is authenticated via API")
- * are defined elsewhere and only reused in the features.
- */
+// ==============================================================================
+// REPORTS — pași în modelul „world / state / context per domeniu"
+// ==============================================================================
+// Toate endpoint-urile de rapoarte sunt de operator (Bearer atașat prin Background).
+// Pașii negativi de autentificare suprascriu headerul authorization ca să forțeze 401.
 
-// ----- Filter metadata -------------------------------------------------------
+// Override-uri de headere pentru cazurile negative (golesc autentificarea de operator).
+const NO_AUTH: HeaderMap = { authorization: '', 'x-api-key': '' };
 
-When('the report filter metadata is requested', async ({ api }) => {
-  api.lastResponse = await api.reports.meta();
-});
+/** Publică ultimul răspuns în starea partajată (cod de stare + corp). */
+function setState(world: UnifiedWorld, res: HttpResponse): void {
+  world.api.state.statusCode = res.statusCode;
+  world.api.state.body = res.body;
+}
 
-// ----- Alerts preview --------------------------------------------------------
-
-When('the alerts report preview is requested', async ({ api }) => {
-  api.lastResponse = await api.reports.preview();
-});
-
-When('the alerts report preview is requested with query {string}', async ({ api }, query: string) => {
-  api.lastResponse = await api.reports.preview(query);
-});
-
-// ----- Alerts download -------------------------------------------------------
-
-When('the alerts report download is requested', async ({ api }) => {
-  api.lastResponse = await api.reports.download();
-});
-
-When('the alerts report download is requested in {string} format', async ({ api }, format: string) => {
-  api.lastResponse = await api.reports.download(`?format=${encodeURIComponent(format)}`);
-});
-
-When('the alerts report download is requested with query {string}', async ({ api }, query: string) => {
-  api.lastResponse = await api.reports.download(query);
-});
-
-// ----- Volume histogram ------------------------------------------------------
-
-When('the report volume histogram is requested', async ({ api }) => {
-  api.lastResponse = await api.reports.volume();
-});
-
-// ----- Curated catalog + curated download ------------------------------------
-
-When('the curated reports catalog is requested', async ({ api }) => {
-  api.lastResponse = await api.reports.curated();
-});
-
-When('the first curated report name is remembered', async ({ api }) => {
-  const data = (api.lastResponse!.body as any)?.data;
-  const list: any[] = Array.isArray(data) ? data : (data?.reports ?? data?.items ?? []);
-  if (!list.length) throw new Error('expected at least one curated report in the catalog');
-  const first = list[0];
+/** Numele primului raport din catalogul curat memorat pentru un alias. */
+function firstCuratedName(world: UnifiedWorld, alias: string): string {
+  const body = world.api.reportsCtx.getCatalog(alias).apiRes.body as ApiReportResponse;
+  const data = (body as { data?: unknown }).data;
+  const list = Array.isArray(data)
+    ? data
+    : ((data as { reports?: unknown[]; items?: unknown[] })?.reports ?? (data as { items?: unknown[] })?.items ?? []);
+  if (!Array.isArray(list) || list.length === 0) throw new Error('aștept cel puțin un raport curat în catalog');
+  const first = list[0] as string | { name?: string; id?: string };
   const name = typeof first === 'string' ? first : (first?.name ?? first?.id);
-  if (!name) throw new Error('could not resolve a curated report name from the catalog');
-  api.context.set('curatedReportName', String(name));
+  if (!name) throw new Error('nu pot rezolva un nume de raport curat din catalog');
+  return String(name);
+}
+
+// ── Filter metadata ─────────────────────────────────────────────────────────
+When(/^the report filter metadata is requested$/, async ({ world }: { world: UnifiedWorld }) => {
+  const res = await world.api.reportsClient.meta();
+  setState(world, res);
+  world.api.log.info({ statusCode: res.statusCode }, 'Cerere metadate filtre rapoarte');
 });
 
-When('the remembered curated report is downloaded', async ({ api }) => {
-  const name = api.context.get<string>('curatedReportName');
-  api.lastResponse = await api.reports.curatedDownload(name);
+When(/^the report filter metadata is requested without authentication$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.reportsClient.meta(NO_AUTH));
 });
 
-When('the curated report {string} is downloaded', async ({ api }, name: string) => {
-  api.lastResponse = await api.reports.curatedDownload(name);
+// ── Alerts preview ──────────────────────────────────────────────────────────
+When(/^the alerts report preview is requested$/, async ({ world }: { world: UnifiedWorld }) => {
+  const res = await world.api.reportsClient.preview();
+  setState(world, res);
+  world.api.log.info({ statusCode: res.statusCode }, 'Cerere preview raport alerte');
 });
 
-// ----- Assertions specific to reports ---------------------------------------
-
-Then('the report response carries a file attachment', async ({ api }) => {
-  const res = api.lastResponse!;
-  expectStatus(res, 200);
-  const disposition = res.headers.get('content-disposition') ?? '';
-  if (!disposition.toLowerCase().includes('attachment')) {
-    throw new Error(`expected a Content-Disposition attachment header, got "${disposition}"`);
-  }
+When(/^the alerts report preview is requested with query "([^"]*)"$/, async ({ world }: { world: UnifiedWorld }, query: string) => {
+  const res = await world.api.reportsClient.preview(query);
+  setState(world, res);
+  world.api.log.info({ query, statusCode: res.statusCode }, 'Cerere preview raport alerte cu filtru');
 });
 
-Then('the report attachment filename contains {string}', async ({ api }, fragment: string) => {
-  const disposition = api.lastResponse!.headers.get('content-disposition') ?? '';
-  if (!disposition.toLowerCase().includes(fragment.toLowerCase())) {
-    throw new Error(`expected Content-Disposition "${disposition}" to contain "${fragment}"`);
-  }
+When(/^the alerts report preview is requested without authentication$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.reportsClient.preview('', NO_AUTH));
 });
 
-Then('the report response content type contains {string}', async ({ api }, fragment: string) => {
-  const contentType = api.lastResponse!.headers.get('content-type') ?? '';
-  if (!contentType.toLowerCase().includes(fragment.toLowerCase())) {
-    throw new Error(`expected Content-Type "${contentType}" to contain "${fragment}"`);
-  }
+// ── Alerts download ─────────────────────────────────────────────────────────
+When(/^the alerts report download is requested in "([^"]*)" format$/, async ({ world }: { world: UnifiedWorld }, format: string) => {
+  const res = await world.api.reportsClient.download(`?format=${encodeURIComponent(format)}`);
+  setState(world, res);
+  world.api.log.info({ format, statusCode: res.statusCode }, 'Descărcare raport alerte');
 });
 
-Then('the report response body is not empty', async ({ api }) => {
-  if (!api.lastResponse!.raw || api.lastResponse!.raw.trim().length === 0) {
-    throw new Error('expected a non-empty report response body');
-  }
+When(/^the alerts report download is requested with query "([^"]*)"$/, async ({ world }: { world: UnifiedWorld }, query: string) => {
+  const res = await world.api.reportsClient.download(query);
+  setState(world, res);
+  world.api.log.info({ query, statusCode: res.statusCode }, 'Descărcare raport alerte cu filtru');
 });
 
-Then('the report response data is a list', async ({ api }) => {
-  const data = (api.lastResponse!.body as any)?.data;
-  const list = Array.isArray(data) ? data : (data?.rows ?? data?.items ?? data?.reports ?? data?.buckets);
-  if (!Array.isArray(list)) {
-    throw new Error('expected the report response data to be (or contain) a list');
-  }
+When(/^the alerts report download is requested without authentication$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.reportsClient.download('', NO_AUTH));
 });
 
-Then('the report response data contains the field {string}', async ({ api }, field: string) => {
-  const data = (api.lastResponse!.body as any)?.data;
-  if (data == null || typeof data !== 'object' || !(field in data)) {
-    throw new Error(`expected the report response data to contain field "${field}"`);
-  }
+// ── Volume histogram ────────────────────────────────────────────────────────
+When(/^the report volume histogram is requested$/, async ({ world }: { world: UnifiedWorld }) => {
+  const res = await world.api.reportsClient.volume();
+  setState(world, res);
+  world.api.log.info({ statusCode: res.statusCode }, 'Cerere histogramă volum');
+});
+
+When(/^the report volume histogram is requested without authentication$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.reportsClient.volume('', NO_AUTH));
+});
+
+// ── Curated catalog + curated download ──────────────────────────────────────
+When(
+  /^the curated reports catalog is requested(?: as (report\d+))?$/,
+  async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
+    const alias = normalizeAlias(aliasToken, ReportsContext.DEFAULT_REPORT_ALIAS, 'report');
+    const res = await world.api.reportsClient.curated();
+    world.api.reportsCtx.setCatalog(alias, res);
+    setState(world, res);
+    world.api.log.info({ alias, statusCode: res.statusCode }, 'Cerere catalog rapoarte curate');
+  },
+);
+
+When(/^the curated reports catalog is requested without authentication$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.reportsClient.curated(NO_AUTH));
+});
+
+When(
+  /^the first curated report from the catalog(?: (report\d+))? is downloaded$/,
+  async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
+    const alias = normalizeAlias(aliasToken, ReportsContext.DEFAULT_REPORT_ALIAS, 'report');
+    const name = firstCuratedName(world, alias);
+    const res = await world.api.reportsClient.curatedDownload(name);
+    setState(world, res);
+    world.api.log.info({ alias, name, statusCode: res.statusCode }, 'Descărcare primul raport curat');
+  },
+);
+
+When(/^the curated report "([^"]*)" is downloaded$/, async ({ world }: { world: UnifiedWorld }, name: string) => {
+  const res = await world.api.reportsClient.curatedDownload(name);
+  setState(world, res);
+  world.api.log.info({ name, statusCode: res.statusCode }, 'Descărcare raport curat după nume');
+});
+
+// ── Aserții specifice domeniului ────────────────────────────────────────────
+Then(/^the report response data is a list$/, async ({ world }: { world: UnifiedWorld }) => {
+  const data = (world.api.state.body as { data?: unknown }).data;
+  const list = Array.isArray(data)
+    ? data
+    : (data as { rows?: unknown; items?: unknown; reports?: unknown; buckets?: unknown })?.rows
+      ?? (data as { items?: unknown })?.items
+      ?? (data as { reports?: unknown })?.reports
+      ?? (data as { buckets?: unknown })?.buckets;
+  expect(Array.isArray(list), `aștept ca data raportului să fie (sau să conțină) o listă, am: ${JSON.stringify(data)}`).toBe(true);
+});
+
+Then(/^the report response data contains the field "([^"]*)"$/, async ({ world }: { world: UnifiedWorld }, field: string) => {
+  const data = (world.api.state.body as { data?: unknown }).data;
+  expect(data != null && typeof data === 'object' && field in (data as object), `aștept câmpul "${field}" în data raportului`).toBe(true);
+});
+
+Then(/^the report response body is not empty$/, async ({ world }: { world: UnifiedWorld }) => {
+  const body = world.api.state.body;
+  const text = typeof body === 'string' ? body : JSON.stringify(body ?? '');
+  expect(text.trim().length, 'aștept un corp de răspuns ne-gol').toBeGreaterThan(0);
 });

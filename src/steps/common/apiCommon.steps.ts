@@ -1,18 +1,18 @@
-import { Then } from '../bdd';
-import { expectStatus } from '../../utils/api/assertionUtils';
+import { expect } from '@playwright/test';
+import { Then } from 'src/steps/bdd';
+import { UnifiedWorld } from '@support/worlds/UnifiedWorld';
 
-Then('the response status is {int}', async ({ api }, status: number) => {
-  expectStatus(api.lastResponse!, status);
+/** Aserțiile partajate citesc ultimul răspuns din world.api.state. */
+Then('the response status is {int}', async ({ world }: { world: UnifiedWorld }, status: number) => {
+  expect(world.api.state.statusCode, `corp: ${JSON.stringify(world.api.state.body)}`).toBe(status);
 });
 
-Then('the response indicates success', async ({ api }) => {
-  const body = api.lastResponse!.body as { success?: boolean };
-  if (body?.success !== true) throw new Error('expected the response to indicate success');
+Then('the response indicates success', async ({ world }: { world: UnifiedWorld }) => {
+  const body = world.api.state.body as { success?: boolean };
+  expect(body?.success).toBe(true);
 });
 
-Then('the response message contains {string}', async ({ api }, text: string) => {
-  const message = String((api.lastResponse!.body as { message?: string })?.message ?? '');
-  if (!message.toLowerCase().includes(text.toLowerCase())) {
-    throw new Error(`expected message to contain "${text}", got "${message}"`);
-  }
+Then('the response message contains {string}', async ({ world }: { world: UnifiedWorld }, text: string) => {
+  const message = String((world.api.state.body as { message?: string })?.message ?? '');
+  expect(message.toLowerCase()).toContain(text.toLowerCase());
 });

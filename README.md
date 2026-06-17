@@ -50,5 +50,7 @@ păstrează Playwright `1.47.x`, **sau** urcă `playwright-bdd` la o versiune co
 Apoi: `npm install && npm test`.
 
 ## Acoperire teste
-55 fișiere `.feature` · 132 de scenarii · pozitive (`requestResponse/`) + negative (`errorHandling/`)
+57 fișiere `.feature` · 141 de scenarii · pozitive (`requestResponse/`) + negative (`errorHandling/`)
 pentru fiecare endpoint al backendului, plus `@web` (consolă) și `@e2e` (flux complet).
+
+Pașii sunt scriși în modelul „world": o singură fixtură `world: UnifiedWorld` (`world.api` cu clienți + context per domeniu + `state` + `log`), pattern-uri regex cu alias opțional, `normalizeAlias`, body-uri tipate zod, date cu `faker` și override de headere pentru cazurile negative.

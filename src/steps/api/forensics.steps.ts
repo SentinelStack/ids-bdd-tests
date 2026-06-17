@@ -1,92 +1,154 @@
-import { Given, When, Then } from '../bdd';
-import { expectStatus } from '../../utils/api/assertionUtils';
-import { newPacketSummary } from '../../data/generators/packetSummaryGenerator';
-import { ForensicsClient } from '../../clients/api/ForensicsClient';
+import { expect } from '@playwright/test';
+import { faker } from '@faker-js/faker';
+import { Given, When, Then } from 'src/steps/bdd';
+import { UnifiedWorld } from '@support/worlds/UnifiedWorld';
+import { ForensicsContext } from '@support/context/ForensicsContext';
+import { normalizeAlias } from 'src/utils/context/contextUtils';
+import { HttpResponse } from 'src/clients/http';
+import { HeaderMap } from 'src/clients/BaseClient';
+import { ApiForensicsResponse, ApiForensicsListResponse } from 'src/schemas/zod/forensics';
 
-/**
- * FORENSICS domain steps.
- * Endpoints:
- *  - POST /api/forensics/packets (agent)   -> 201 packet metadata ingest
- *  - GET  /api/forensics        (operator) -> 200 list / filter by device
- * All step phrases are prefixed with the "forensic" noun so they never collide
- * with other domains' steps.
- */
+// ==============================================================================
+// FORENSICS — pași în modelul „world / state / context per domeniu"
+// Endpoint-uri: POST /api/forensics/packets (agent, cheia API) ; GET /api/forensics (operator)
+// Toate frazele încep cu substantivul „forensic" ca să nu se ciocnească cu alte domenii.
+// ==============================================================================
 
-// --- POST /api/forensics/packets (agent ingest) ---
+// Override-uri de headere pentru cazurile negative (forțează 401 / cheie invalidă).
+const NO_API_KEY: HeaderMap = { 'x-api-key': '' };
+const BAD_API_KEY: HeaderMap = { 'x-api-key': 'not-a-real-key' };
+const NO_AUTH: HeaderMap = { 'x-api-key': '', authorization: '' };
+const UNKNOWN_DEVICE = `dev-${faker.string.alphanumeric(10).toLowerCase()}`;
 
-Given('a captured forensic packet for device {string}', async ({ api }, deviceId: string) => {
-  api.context.set('forensicPacket', newPacketSummary({ deviceId }));
-  api.context.set('forensicDeviceId', deviceId);
-});
+/** Corp valid de pachet capturat (doar metadate, fără payload PCAP), randomizat cu faker. */
+function validPacketPayload(overrides: Record<string, unknown> = {}) {
+  return {
+    packetId: `pkt-${faker.string.alphanumeric(10).toLowerCase()}`,
+    deviceId: `dev-${faker.string.alphanumeric(8).toLowerCase()}`,
+    protocol: faker.helpers.arrayElement(['TCP', 'UDP', 'ICMP']),
+    sourceIp: faker.internet.ipv4(),
+    sourcePort: faker.internet.port(),
+    destinationIp: faker.internet.ipv4(),
+    destinationPort: faker.internet.port(),
+    length: faker.number.int({ min: 40, max: 1500 }),
+    flags: faker.helpers.arrayElement(['SYN', 'ACK', 'PSH', 'FIN']),
+    capturedAt: new Date().toISOString(),
+    ...overrides,
+  };
+}
 
-Given('a captured forensic packet', async ({ api }) => {
-  const packet = newPacketSummary();
-  api.context.set('forensicPacket', packet);
-  api.context.set('forensicDeviceId', packet.deviceId);
-});
+/** Publică ultimul răspuns în starea partajată (cod de stare + corp). */
+function setState(world: UnifiedWorld, res: HttpResponse): void {
+  world.api.state.statusCode = res.statusCode;
+  world.api.state.body = res.body;
+}
 
-Given('the forensic packet is missing the {string} field', async ({ api }, field: string) => {
-  const packet = { ...api.context.get<Record<string, unknown>>('forensicPacket') };
-  delete packet[field];
-  api.context.set('forensicPacket', packet);
-});
+/** Id-ul dispozitivului pachetului ingerat anterior pentru un alias. */
+function ingestedDeviceId(world: UnifiedWorld, alias: string): string {
+  const body = world.api.forensicsCtx.getIngest(alias).apiRes.body as ApiForensicsResponse;
+  return body.data?.deviceId ?? 'ForensicDeviceIdMissing';
+}
 
-When('the forensic packet is ingested by the agent', async ({ api }) => {
-  api.lastResponse = await api.forensics.packets(api.context.get('forensicPacket'));
-});
-
-When('a malformed forensic packet {string} is ingested by the agent', async ({ api }, payload: string) => {
-  api.lastResponse = await api.forensics.packets(payload);
-});
-
-When('the forensic packet is ingested without authentication', async ({ api, env }) => {
-  const bare = new ForensicsClient(env.apiBaseUrl);
-  api.lastResponse = await bare.packets(api.context.get('forensicPacket'));
-});
-
-// --- GET /api/forensics (operator list/filter) ---
-
-Given('a forensic packet for device {string} has been ingested', async ({ api }, deviceId: string) => {
-  const packet = newPacketSummary({ deviceId });
-  const res = await api.forensics.packets(packet);
-  expectStatus(res, 201);
-  api.context.set('forensicDeviceId', deviceId);
-});
-
-When('the forensic packet list is requested', async ({ api }) => {
-  api.lastResponse = await api.forensics.list();
-});
-
-When('the forensic packet list is requested for device {string}', async ({ api }, deviceId: string) => {
-  api.lastResponse = await api.forensics.list(`?deviceId=${encodeURIComponent(deviceId)}`);
-});
-
-When('the forensic packet list is requested without authentication', async ({ api, env }) => {
-  const bare = new ForensicsClient(env.apiBaseUrl);
-  api.lastResponse = await bare.list();
-});
-
+// ── Ingest (agent) ──────────────────────────────────────────────────────────
 When(
-  'the forensic packet list is requested for device {string} without authentication',
-  async ({ api, env }, deviceId: string) => {
-    const bare = new ForensicsClient(env.apiBaseUrl);
-    api.lastResponse = await bare.list(`?deviceId=${encodeURIComponent(deviceId)}`);
+  /^I ingest a forensic packet(?: (forensics\d+))?$/,
+  async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
+    const alias = normalizeAlias(aliasToken, ForensicsContext.DEFAULT_FORENSICS_ALIAS, 'forensics');
+    const res = await world.api.forensicsClient.packets(validPacketPayload());
+    world.api.forensicsCtx.setIngest(alias, res);
+    setState(world, res);
+    world.api.log.info({ alias, statusCode: res.statusCode }, 'Ingest pachet forensic');
   },
 );
 
-// --- Assertions specific to forensics ---
+When(
+  /^I ingest a forensic packet for device "([^"]*)"(?: (forensics\d+))?$/,
+  async ({ world }: { world: UnifiedWorld }, deviceId: string, aliasToken?: string) => {
+    const alias = normalizeAlias(aliasToken, ForensicsContext.DEFAULT_FORENSICS_ALIAS, 'forensics');
+    const res = await world.api.forensicsClient.packets(validPacketPayload({ deviceId }));
+    world.api.forensicsCtx.setIngest(alias, res);
+    setState(world, res);
+    world.api.log.info({ alias, deviceId, statusCode: res.statusCode }, 'Ingest pachet forensic pentru dispozitiv');
+  },
+);
 
-Then('the forensic response returns a packet collection', async ({ api }) => {
-  const data = (api.lastResponse!.body as { data?: unknown })?.data;
-  if (!Array.isArray(data)) {
-    throw new Error(`expected forensic data to be an array, got ${JSON.stringify(data)}`);
-  }
+When(
+  /^I ingest a forensic packet with the "([^"]*)" field omitted$/,
+  async ({ world }: { world: UnifiedWorld }, field: string) => {
+    const payload = validPacketPayload();
+    delete (payload as Record<string, unknown>)[field];
+    const res = await world.api.forensicsClient.packets(payload);
+    setState(world, res);
+    world.api.log.info({ field, statusCode: res.statusCode }, 'Ingest pachet forensic cu câmp lipsă');
+  },
+);
+
+When(/^I ingest a malformed forensic packet$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.forensicsClient.packets('not-a-json-object'));
 });
 
-Then('every forensic packet in the response belongs to device {string}', async ({ api }, deviceId: string) => {
-  const data = (api.lastResponse!.body as { data?: Array<{ deviceId?: string }> })?.data ?? [];
-  const mismatch = data.find((p) => p.deviceId !== deviceId);
-  if (mismatch) {
-    throw new Error(`found forensic packet not belonging to device "${deviceId}": ${JSON.stringify(mismatch)}`);
-  }
+When(/^I ingest a forensic packet without an API key$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.forensicsClient.packets(validPacketPayload(), NO_API_KEY));
 });
+
+When(/^I ingest a forensic packet with an invalid API key$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.forensicsClient.packets(validPacketPayload(), BAD_API_KEY));
+});
+
+// ── Setup pentru listare (operator) ───────────────────────────────────────────
+Given(
+  /^a forensic packet has been ingested for device "([^"]*)"(?: (forensics\d+))?$/,
+  async ({ world }: { world: UnifiedWorld }, deviceId: string, aliasToken?: string) => {
+    const alias = normalizeAlias(aliasToken, ForensicsContext.DEFAULT_FORENSICS_ALIAS, 'forensics');
+    const res = await world.api.forensicsClient.packets(validPacketPayload({ deviceId }));
+    world.api.forensicsCtx.setIngest(alias, res);
+    world.api.log.info({ alias, deviceId, statusCode: res.statusCode }, 'Precondiție: pachet forensic ingerat');
+  },
+);
+
+// ── List (operator) ───────────────────────────────────────────────────────────
+When(/^I list the forensic packets as the operator$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.forensicsClient.list());
+});
+
+When(
+  /^I list the forensic packets for device "([^"]*)" as the operator$/,
+  async ({ world }: { world: UnifiedWorld }, deviceId: string) => {
+    setState(world, await world.api.forensicsClient.listByDevice(deviceId));
+  },
+);
+
+When(/^I list the forensic packets for an unknown device as the operator$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.forensicsClient.listByDevice(UNKNOWN_DEVICE));
+});
+
+When(/^I list the forensic packets without authentication$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.forensicsClient.list('', NO_AUTH));
+});
+
+When(
+  /^I list the forensic packets for device "([^"]*)" without authentication$/,
+  async ({ world }: { world: UnifiedWorld }, deviceId: string) => {
+    setState(world, await world.api.forensicsClient.listByDevice(deviceId, NO_AUTH));
+  },
+);
+
+// ── Aserții specifice domeniului ──────────────────────────────────────────────
+Then(/^the forensic response contains a packet id$/, async ({ world }: { world: UnifiedWorld }) => {
+  const body = world.api.state.body as ApiForensicsResponse;
+  expect(body.data?.packetId, `aștept data.packetId, am: ${JSON.stringify(body)}`).toBeTruthy();
+});
+
+Then(/^the forensic response contains a packet collection$/, async ({ world }: { world: UnifiedWorld }) => {
+  const data = (world.api.state.body as { data?: unknown }).data;
+  expect(Array.isArray(data), 'aștept ca data să fie o colecție de pachete').toBe(true);
+});
+
+Then(
+  /^every forensic packet in the response belongs to device "([^"]*)"$/,
+  async ({ world }: { world: UnifiedWorld }, deviceId: string) => {
+    const data = (world.api.state.body as ApiForensicsListResponse).data ?? [];
+    const mismatch = data.find((p) => p.deviceId !== deviceId);
+    expect(mismatch, `am găsit un pachet care nu aparține lui „${deviceId}": ${JSON.stringify(mismatch)}`).toBeUndefined();
+  },
+);

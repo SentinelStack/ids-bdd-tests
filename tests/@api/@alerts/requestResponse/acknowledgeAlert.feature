@@ -15,9 +15,7 @@ Feature: Acknowledge alerts as an operator
     And the response indicates success
 
   Scenario: Acknowledging a critical alert succeeds
-    Given an alert payload is prepared
-    And the alert field "severity" is set to "CRITICAL"
-    When the agent ingests the prepared alert
+    When the agent ingests an alert with severity "CRITICAL" protocol "TCP" source ip "203.0.113.5"
     Then the response status is 201
     When the operator acknowledges the ingested alert
     Then the response status is 200

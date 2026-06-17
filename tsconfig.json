@@ -9,7 +9,16 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "baseUrl": ".",
-    "paths": { "@/*": ["src/*"] }
+    "paths": {
+      "@support/*": ["src/support/*"],
+      "@clients/*": ["src/clients/*"],
+      "@utils/*": ["src/utils/*"],
+      "@schemas/*": ["src/schemas/*"],
+      "@data/*": ["src/data/*"],
+      "@pages/*": ["src/pages/*"],
+      "src/*": ["src/*"],
+      "@/*": ["src/*"]
+    }
   },
   "include": ["src", "scripts", "playwright.config.ts"]
 }

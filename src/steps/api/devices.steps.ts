@@ -1,204 +1,223 @@
-import { Given, When, Then } from '../bdd';
-import { expectStatus } from '../../utils/api/assertionUtils';
-import { newDevice, newHeartbeat } from '../../data/generators/deviceGenerator';
-import { DevicesClient } from '../../clients/api/DevicesClient';
+import { expect } from '@playwright/test';
+import { faker } from '@faker-js/faker';
+import { Given, When, Then } from 'src/steps/bdd';
+import { UnifiedWorld } from '@support/worlds/UnifiedWorld';
+import { DeviceContext } from '@support/context/DeviceContext';
+import { normalizeAlias } from 'src/utils/context/contextUtils';
+import { HttpResponse } from 'src/clients/http';
+import { HeaderMap } from 'src/clients/BaseClient';
+import { ApiDeviceResponse } from 'src/schemas/zod/devices';
 
-/**
- * DEVICES domain steps.
- * Step phrases are prefixed with the "device" noun so they never collide with other domains.
- * Operator-only endpoints (list / quarantine / release) require the operator Bearer; the
- * common Background step "the operator is authenticated via API" stores it under
- * context key 'operatorToken', so we attach it to the devices client on demand.
- */
+// ==============================================================================
+// DEVICES — pași în modelul „world / state / context per domeniu"
+// ==============================================================================
 
-const CONTEXT = {
-  deviceId: 'device.deviceId',
-  registerBody: 'device.registerBody',
-  apiKey: 'device.apiKey',
-};
+// Override-uri de headere pentru cazurile negative (forțează 401 / cheie invalidă).
+const NO_API_KEY: HeaderMap = { 'x-api-key': '' };
+const BAD_API_KEY: HeaderMap = { 'x-api-key': 'not-a-real-key' };
+const NO_AUTH: HeaderMap = { 'x-api-key': '', authorization: '' };
+const UNKNOWN_ID = '00000000-0000-0000-0000-000000000000';
 
-/** Attach the operator Bearer (set by the auth Background) to the devices client. */
-function authorizeDevicesAsOperator(api: any): void {
-  const token = api.context.get('operatorToken') as string;
-  api.devices.setAuth({ authorization: `Bearer ${token}` });
+/** Corp valid de înregistrare (router de margine), randomizat cu faker. */
+function validDevicePayload(overrides: Record<string, unknown> = {}) {
+  return {
+    name: `router-${faker.string.alphanumeric(8).toLowerCase()}`,
+    ipAddress: faker.internet.ipv4(),
+    firmware: `${faker.number.int({ min: 19, max: 23 })}.05.${faker.number.int({ min: 0, max: 6 })}`,
+    model: faker.helpers.arrayElement(['gl-mt300n', 'archer-c7', 'test-router']),
+    ...overrides,
+  };
 }
 
-/** Build a fresh, valid registration body and remember it for later assertions/overrides. */
-Given('a valid device registration payload', async ({ api }) => {
-  api.context.set(CONTEXT.registerBody, newDevice());
+function validHeartbeat() {
+  return {
+    cpuPercent: faker.number.int({ min: 1, max: 95 }),
+    memPercent: faker.number.int({ min: 1, max: 95 }),
+    seenAt: new Date().toISOString(),
+  };
+}
+
+/** Publică ultimul răspuns în starea partajată (cod de stare + corp). */
+function setState(world: UnifiedWorld, res: HttpResponse): void {
+  world.api.state.statusCode = res.statusCode;
+  world.api.state.body = res.body;
+}
+
+/** Id-ul dispozitivului înregistrat anterior pentru un alias. */
+function registeredId(world: UnifiedWorld, alias: string): string {
+  const body = world.api.deviceCtx.getRegister(alias).apiRes.body as ApiDeviceResponse;
+  return body.data?.deviceId ?? 'DeviceIdMissing';
+}
+
+// ── Setup ─────────────────────────────────────────────────────────────────────
+Given(
+  /^a device has been registered(?: as (device\d+))?$/,
+  async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
+    const alias = normalizeAlias(aliasToken, DeviceContext.DEFAULT_DEVICE_ALIAS, 'device');
+    const res = await world.api.devicesClient.register(validDevicePayload());
+    world.api.deviceCtx.setRegister(alias, res);
+    world.api.log.info({ alias, statusCode: res.statusCode }, 'Precondiție: dispozitiv înregistrat');
+  },
+);
+
+// ── Register ──────────────────────────────────────────────────────────────────
+When(
+  /^I register a new device(?: (device\d+))?$/,
+  async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
+    const alias = normalizeAlias(aliasToken, DeviceContext.DEFAULT_DEVICE_ALIAS, 'device');
+    const res = await world.api.devicesClient.register(validDevicePayload());
+    world.api.deviceCtx.setRegister(alias, res);
+    setState(world, res);
+    world.api.log.info({ alias, statusCode: res.statusCode }, 'Înregistrare dispozitiv');
+  },
+);
+
+When(
+  /^I register a device with the "([^"]*)" field set to "([^"]*)"$/,
+  async ({ world }: { world: UnifiedWorld }, field: string, value: string) => {
+    const res = await world.api.devicesClient.register(validDevicePayload({ [field]: value }));
+    setState(world, res);
+    world.api.log.info({ field, value, statusCode: res.statusCode }, 'Înregistrare cu câmp suprascris');
+  },
+);
+
+When(
+  /^I register a device with the "([^"]*)" field omitted$/,
+  async ({ world }: { world: UnifiedWorld }, field: string) => {
+    const payload = validDevicePayload();
+    delete (payload as Record<string, unknown>)[field];
+    const res = await world.api.devicesClient.register(payload);
+    setState(world, res);
+    world.api.log.info({ field, statusCode: res.statusCode }, 'Înregistrare cu câmp lipsă');
+  },
+);
+
+When(/^I register a device without an API key$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.devicesClient.register(validDevicePayload(), NO_API_KEY));
 });
 
-/** Override a single field of the pending registration payload (use "" for blank/removed). */
-Given('the device registration field {string} is set to {string}', async ({ api }, field: string, value: string) => {
-  const body = { ...(api.context.get(CONTEXT.registerBody) as Record<string, unknown>) };
-  body[field] = value;
-  api.context.set(CONTEXT.registerBody, body);
+When(/^I register a device with an invalid API key$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.devicesClient.register(validDevicePayload(), BAD_API_KEY));
 });
 
-/** Remove a mandatory field entirely from the pending registration payload. */
-Given('the device registration field {string} is removed', async ({ api }, field: string) => {
-  const body = { ...(api.context.get(CONTEXT.registerBody) as Record<string, unknown>) };
-  delete body[field];
-  api.context.set(CONTEXT.registerBody, body);
+// ── Heartbeat ─────────────────────────────────────────────────────────────────
+When(
+  /^I send a heartbeat for the registered device(?: (device\d+))?$/,
+  async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
+    const alias = normalizeAlias(aliasToken, DeviceContext.DEFAULT_DEVICE_ALIAS, 'device');
+    setState(world, await world.api.devicesClient.heartbeat(registeredId(world, alias), validHeartbeat()));
+  },
+);
+
+When(/^I send a heartbeat for an unknown device$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.devicesClient.heartbeat(UNKNOWN_ID, validHeartbeat()));
 });
 
-/** Register a brand-new device (agent X-API-Key) and capture the new deviceId. */
-Given('a device is registered', async ({ api }) => {
-  api.lastResponse = await api.devices.register(newDevice());
-  const id = (api.lastResponse.body as any)?.data?.deviceId;
-  if (!id) throw new Error('device registration did not return a deviceId');
-  api.context.set(CONTEXT.deviceId, String(id));
+When(
+  /^I send a malformed heartbeat for the registered device(?: (device\d+))?$/,
+  async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
+    const alias = normalizeAlias(aliasToken, DeviceContext.DEFAULT_DEVICE_ALIAS, 'device');
+    setState(world, await world.api.devicesClient.heartbeat(registeredId(world, alias), { cpuPercent: 'high', seenAt: 'not-a-date' }));
+  },
+);
+
+When(
+  /^I send a heartbeat for the registered device(?: (device\d+))? without authentication$/,
+  async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
+    const alias = normalizeAlias(aliasToken, DeviceContext.DEFAULT_DEVICE_ALIAS, 'device');
+    setState(world, await world.api.devicesClient.heartbeat(registeredId(world, alias), validHeartbeat(), NO_AUTH));
+  },
+);
+
+// ── Ruleset ───────────────────────────────────────────────────────────────────
+When(
+  /^I request the ruleset for the registered device(?: (device\d+))? using the API key header$/,
+  async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
+    const alias = normalizeAlias(aliasToken, DeviceContext.DEFAULT_DEVICE_ALIAS, 'device');
+    setState(world, await world.api.devicesClient.ruleset(registeredId(world, alias)));
+  },
+);
+
+When(
+  /^I request the ruleset for the registered device(?: (device\d+))? using the API key query parameter$/,
+  async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
+    const alias = normalizeAlias(aliasToken, DeviceContext.DEFAULT_DEVICE_ALIAS, 'device');
+    // Fără cheie în header (NO_API_KEY), doar în query — verifică autentificarea pe query param.
+    setState(world, await world.api.devicesClient.rulesetByQuery(registeredId(world, alias), world.api.env.agentApiKey, NO_API_KEY));
+  },
+);
+
+When(/^I request the ruleset for an unknown device$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.devicesClient.ruleset(UNKNOWN_ID));
 });
 
-/** Send the currently prepared registration payload (agent X-API-Key). */
-When('the device registration is submitted', async ({ api }) => {
-  api.lastResponse = await api.devices.register(api.context.get(CONTEXT.registerBody));
+When(
+  /^I request the ruleset for the registered device(?: (device\d+))? without credentials$/,
+  async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
+    const alias = normalizeAlias(aliasToken, DeviceContext.DEFAULT_DEVICE_ALIAS, 'device');
+    setState(world, await world.api.devicesClient.ruleset(registeredId(world, alias), NO_AUTH));
+  },
+);
+
+// ── List (operator) ───────────────────────────────────────────────────────────
+When(/^I list the devices as the operator$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.devicesClient.list());
 });
 
-/** Send a registration payload without any API key (unauthenticated bare client). */
-When('the device registration is submitted without an API key', async ({ api, env }) => {
-  const bare = new DevicesClient(env.apiBaseUrl);
-  api.lastResponse = await bare.register(newDevice());
+When(/^I list the devices without authentication$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.devicesClient.list(NO_AUTH));
 });
 
-/** Send a registration payload with an invalid API key (bare client + bad key). */
-When('the device registration is submitted with an invalid API key', async ({ api, env }) => {
-  const bad = new DevicesClient(env.apiBaseUrl, { 'x-api-key': 'not-a-real-key' });
-  api.lastResponse = await bad.register(newDevice());
+// ── Quarantine / Release (operator) ───────────────────────────────────────────
+When(
+  /^I quarantine the registered device(?: (device\d+))? as the operator$/,
+  async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
+    const alias = normalizeAlias(aliasToken, DeviceContext.DEFAULT_DEVICE_ALIAS, 'device');
+    setState(world, await world.api.devicesClient.quarantine(registeredId(world, alias)));
+  },
+);
+
+When(
+  /^I release the registered device(?: (device\d+))? as the operator$/,
+  async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
+    const alias = normalizeAlias(aliasToken, DeviceContext.DEFAULT_DEVICE_ALIAS, 'device');
+    setState(world, await world.api.devicesClient.release(registeredId(world, alias)));
+  },
+);
+
+When(/^I quarantine an unknown device as the operator$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.devicesClient.quarantine(UNKNOWN_ID));
 });
 
-/** Send a valid heartbeat for the previously registered device. */
-When('a heartbeat is sent for the registered device', async ({ api }) => {
-  const id = api.context.get(CONTEXT.deviceId) as string;
-  api.lastResponse = await api.devices.heartbeat(id, newHeartbeat());
+When(/^I release an unknown device as the operator$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.devicesClient.release(UNKNOWN_ID));
 });
 
-/** Send a heartbeat for a device id that does not exist. */
-When('a heartbeat is sent for an unknown device', async ({ api }) => {
-  api.lastResponse = await api.devices.heartbeat('00000000-0000-0000-0000-000000000000', newHeartbeat());
+When(
+  /^I quarantine the registered device(?: (device\d+))? without authentication$/,
+  async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
+    const alias = normalizeAlias(aliasToken, DeviceContext.DEFAULT_DEVICE_ALIAS, 'device');
+    setState(world, await world.api.devicesClient.quarantine(registeredId(world, alias), NO_AUTH));
+  },
+);
+
+// ── Aserții specifice domeniului ──────────────────────────────────────────────
+Then(/^the device response contains a device id$/, async ({ world }: { world: UnifiedWorld }) => {
+  const body = world.api.state.body as ApiDeviceResponse;
+  expect(body.data?.deviceId, `aștept data.deviceId, am: ${JSON.stringify(body)}`).toBeTruthy();
 });
 
-/** Send a malformed heartbeat body (not the expected metric shape). */
-When('a malformed heartbeat is sent for the registered device', async ({ api }) => {
-  const id = api.context.get(CONTEXT.deviceId) as string;
-  api.lastResponse = await api.devices.heartbeat(id, { cpuPercent: 'high', seenAt: 'not-a-date' });
+Then(/^the device response contains thresholds$/, async ({ world }: { world: UnifiedWorld }) => {
+  const body = world.api.state.body as ApiDeviceResponse;
+  expect(body.data?.thresholds, 'aștept praguri în ruleset').not.toBeUndefined();
 });
 
-/** Send a heartbeat with no credentials (bare client). */
-When('a heartbeat is sent for the registered device without authentication', async ({ api, env }) => {
-  const id = api.context.get(CONTEXT.deviceId) as string;
-  const bare = new DevicesClient(env.apiBaseUrl);
-  api.lastResponse = await bare.heartbeat(id, newHeartbeat());
+Then(/^the device response contains a list of devices$/, async ({ world }: { world: UnifiedWorld }) => {
+  const data = (world.api.state.body as { data?: unknown }).data;
+  expect(Array.isArray(data), 'aștept ca data să fie o listă de dispozitive').toBe(true);
 });
 
-/** Request the ruleset for the registered device using the agent API key header. */
-When('the device ruleset is requested with the API key header', async ({ api }) => {
-  const id = api.context.get(CONTEXT.deviceId) as string;
-  api.lastResponse = await api.devices.ruleset(id);
-});
-
-/** Request the ruleset for the registered device using the ?apiKey= query parameter. */
-When('the device ruleset is requested with the API key query parameter', async ({ api, env }) => {
-  const id = api.context.get(CONTEXT.deviceId) as string;
-  const bare = new DevicesClient(env.apiBaseUrl);
-  api.lastResponse = await bare.rulesetByQuery(id, env.agentApiKey);
-});
-
-/** Request the ruleset for an unknown device (agent API key header present). */
-When('the device ruleset is requested for an unknown device', async ({ api }) => {
-  api.lastResponse = await api.devices.ruleset('00000000-0000-0000-0000-000000000000');
-});
-
-/** Request the ruleset with no credentials at all (bare client, no key, no token). */
-When('the device ruleset is requested without credentials', async ({ api, env }) => {
-  const id = api.context.get(CONTEXT.deviceId) as string;
-  const bare = new DevicesClient(env.apiBaseUrl);
-  api.lastResponse = await bare.ruleset(id);
-});
-
-/** List all devices as the authenticated operator. */
-When('the device list is requested by the operator', async ({ api }) => {
-  authorizeDevicesAsOperator(api);
-  api.lastResponse = await api.devices.list();
-});
-
-/** List all devices with no credentials (bare client). */
-When('the device list is requested without authentication', async ({ api, env }) => {
-  const bare = new DevicesClient(env.apiBaseUrl);
-  api.lastResponse = await bare.list();
-});
-
-/** Quarantine the registered device as the authenticated operator. */
-When('the registered device is quarantined by the operator', async ({ api }) => {
-  authorizeDevicesAsOperator(api);
-  const id = api.context.get(CONTEXT.deviceId) as string;
-  api.lastResponse = await api.devices.quarantine(id);
-});
-
-/** Release the registered device as the authenticated operator. */
-When('the registered device is released by the operator', async ({ api }) => {
-  authorizeDevicesAsOperator(api);
-  const id = api.context.get(CONTEXT.deviceId) as string;
-  api.lastResponse = await api.devices.release(id);
-});
-
-/** Quarantine an unknown device as the authenticated operator. */
-When('an unknown device is quarantined by the operator', async ({ api }) => {
-  authorizeDevicesAsOperator(api);
-  api.lastResponse = await api.devices.quarantine('00000000-0000-0000-0000-000000000000');
-});
-
-/** Release an unknown device as the authenticated operator. */
-When('an unknown device is released by the operator', async ({ api }) => {
-  authorizeDevicesAsOperator(api);
-  api.lastResponse = await api.devices.release('00000000-0000-0000-0000-000000000000');
-});
-
-/** Quarantine the registered device with no credentials (bare client). */
-When('the registered device is quarantined without authentication', async ({ api, env }) => {
-  const id = api.context.get(CONTEXT.deviceId) as string;
-  const bare = new DevicesClient(env.apiBaseUrl);
-  api.lastResponse = await bare.quarantine(id);
-});
-
-/** Release the registered device with no credentials (bare client). */
-When('the registered device is released without authentication', async ({ api, env }) => {
-  const id = api.context.get(CONTEXT.deviceId) as string;
-  const bare = new DevicesClient(env.apiBaseUrl);
-  api.lastResponse = await bare.release(id);
-});
-
-/** Assert that the registration response carried a non-empty deviceId. */
-Then('the response contains a device id', async ({ api }) => {
-  const id = (api.lastResponse!.body as any)?.data?.deviceId;
-  if (!id) throw new Error(`expected data.deviceId in response, got: ${api.lastResponse!.raw}`);
-});
-
-/** Assert the ruleset response exposes the threshold configuration. */
-Then('the response contains device thresholds', async ({ api }) => {
-  const thresholds = (api.lastResponse!.body as any)?.data?.thresholds;
-  if (thresholds === undefined || thresholds === null) {
-    throw new Error(`expected data.thresholds in ruleset response, got: ${api.lastResponse!.raw}`);
-  }
-});
-
-/** Assert the response payload is an array of devices. */
-Then('the response contains a list of devices', async ({ api }) => {
-  const data = (api.lastResponse!.body as any)?.data;
-  if (!Array.isArray(data)) {
-    throw new Error(`expected data to be an array of devices, got: ${api.lastResponse!.raw}`);
-  }
-});
-
-/** Assert the device status field equals the given value (e.g. QUARANTINED / ONLINE). */
-Then('the device status is {string}', async ({ api }, expected: string) => {
-  const status = (api.lastResponse!.body as any)?.data?.status;
-  if (String(status) !== expected) {
-    throw new Error(`expected device status "${expected}", got "${status}"`);
-  }
-});
-
-/** Local convenience assertion identical in spirit to the common one, kept device-scoped. */
-Then('the device endpoint responds with status {int}', async ({ api }, status: number) => {
-  expectStatus(api.lastResponse!, status);
+Then(/^the registered device has status "([^"]*)"$/, async ({ world }: { world: UnifiedWorld }, expected: string) => {
+  const body = world.api.state.body as ApiDeviceResponse;
+  expect(body.data?.status).toBe(expected);
 });

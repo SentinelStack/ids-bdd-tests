@@ -6,21 +6,21 @@ Feature: Toggle an edge detection rule
 
   Background:
     Given the operator is authenticated via API
-    And an existing rule id is captured from the rule list
+    And an existing rule is captured from the rule list
 
   Scenario: Disable a rule
-    When the captured rule is toggled to enabled "false"
+    When I toggle the captured rule to enabled "false"
     Then the response status is 200
     And the response indicates success
     And the returned rule reports enabled "false"
 
   Scenario: Enable a rule
-    When the captured rule is toggled to enabled "true"
+    When I toggle the captured rule to enabled "true"
     Then the response status is 200
     And the response indicates success
     And the returned rule reports enabled "true"
 
   Scenario: Flip a rule to the opposite of its current state
-    When the captured rule enabled flag is flipped
+    When I flip the captured rule to its opposite state
     Then the response status is 200
     And the response indicates success

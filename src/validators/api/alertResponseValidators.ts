@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
-import { AlertSchema } from '../../schemas/zod/alert.zod';
-import { HttpResponse } from '../../clients/http';
+import { AlertSchema } from 'src/schemas/zod/alert.zod';
+import { HttpResponse } from 'src/clients/http';
 
 export function validateAlertCollection(res: HttpResponse<any>): void {
   const data = res.body?.data?.content ?? res.body?.data ?? [];

@@ -1,17 +1,16 @@
 @api @devices
-Feature: Fetch a device ruleset
-  A device's detection thresholds can be fetched with an API key header, an apiKey query
-  parameter, or an operator bearer token.
+Feature: Edge device ruleset
+  An agent fetches its detection thresholds, authenticating by header or by query key.
 
-  Scenario: The ruleset is returned when using the API key header
-    Given a device is registered
-    When the device ruleset is requested with the API key header
-    Then the response status is 200
-    And the response indicates success
-    And the response contains device thresholds
+  Background:
+    Given a device has been registered
 
-  Scenario: The ruleset is returned when using the apiKey query parameter
-    Given a device is registered
-    When the device ruleset is requested with the API key query parameter
+  Scenario: The ruleset is returned when authenticating with the API key header
+    When I request the ruleset for the registered device using the API key header
     Then the response status is 200
-    And the response contains device thresholds
+    And the device response contains thresholds
+
+  Scenario: The ruleset is returned when authenticating with the API key query parameter
+    When I request the ruleset for the registered device using the API key query parameter
+    Then the response status is 200
+    And the device response contains thresholds

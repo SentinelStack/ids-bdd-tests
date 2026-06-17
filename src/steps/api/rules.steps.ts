@@ -1,102 +1,150 @@
-import { Given, When, Then } from '../bdd';
-import { expectStatus } from '../../utils/api/assertionUtils';
-import { RulesClient } from '../../clients/api/RulesClient';
+import { expect } from '@playwright/test';
+import { Given, When, Then } from 'src/steps/bdd';
+import { UnifiedWorld } from '@support/worlds/UnifiedWorld';
+import { RulesContext } from '@support/context/RulesContext';
+import { normalizeAlias } from 'src/utils/context/contextUtils';
+import { HttpResponse } from 'src/clients/http';
+import { HeaderMap } from 'src/clients/BaseClient';
+import { ApiRuleResponse, ApiRuleListResponse } from 'src/schemas/zod/rules';
 
-/** Shape of a single rule as returned inside the list envelope's data.content. */
-interface RuleSummary {
-  ruleId: string;
-  name?: string;
-  category?: string;
-  enabled?: boolean;
-}
+// ==============================================================================
+// RULES — pași în modelul „world / state / context per domeniu"
+// ==============================================================================
 
-/** Read the rules array out of whichever envelope shape the last response carries. */
+// Override-uri de headere pentru cazurile negative (forțează 401). Regulile sunt
+// endpoint de operator (Bearer), deci anulăm doar antetul de autentificare.
+const NO_AUTH: HeaderMap = { authorization: '' };
+const UNKNOWN_RULE_ID = 'EDGE-RULE-DOES-NOT-EXIST-999';
+
+/** O singură regulă din plicul listei. */
+interface RuleSummary { ruleId: string; name?: string; category?: string; enabled?: boolean }
+
+/** Extrage tabloul de reguli din data.content al ultimului răspuns. */
 function ruleListFrom(body: unknown): RuleSummary[] {
-  const data = (body as { data?: { content?: RuleSummary[] } })?.data;
-  return Array.isArray(data?.content) ? data!.content! : [];
+  const data = (body as ApiRuleListResponse)?.data;
+  return Array.isArray(data?.content) ? (data!.content as RuleSummary[]) : [];
 }
 
-// ---------------------------------------------------------------------------
-// GET /api/rules
-// ---------------------------------------------------------------------------
+/** Publică ultimul răspuns în starea partajată (cod de stare + corp). */
+function setState(world: UnifiedWorld, res: HttpResponse): void {
+  world.api.state.statusCode = res.statusCode;
+  world.api.state.body = res.body;
+}
 
-When('the rule list is requested', async ({ api }) => {
-  api.lastResponse = await api.rules.list();
+/** Id-ul regulii capturate anterior din lista stocată pentru un alias. */
+function capturedRuleId(world: UnifiedWorld, alias: string): string {
+  const body = world.api.rulesCtx.getList(alias).apiRes.body;
+  const first = ruleListFrom(body)[0];
+  if (!first) throw new Error(`nu există nicio regulă capturată pentru alias-ul „${alias}"`);
+  return first.ruleId;
+}
+
+/** Starea curentă „enabled" a primei reguli capturate pentru un alias. */
+function capturedRuleEnabled(world: UnifiedWorld, alias: string): boolean {
+  const body = world.api.rulesCtx.getList(alias).apiRes.body;
+  return ruleListFrom(body)[0]?.enabled === true;
+}
+
+// ── Setup ─────────────────────────────────────────────────────────────────────
+Given(
+  /^an existing rule is captured from the rule list(?: as (rule\d+))?$/,
+  async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
+    const alias = normalizeAlias(aliasToken, RulesContext.DEFAULT_RULE_ALIAS, 'rule');
+    const res = await world.api.rulesClient.list();
+    world.api.rulesCtx.setList(alias, res);
+    if (ruleListFrom(res.body).length === 0) throw new Error('lista de reguli e goală — nu pot captura un id');
+    world.api.log.info({ alias, statusCode: res.statusCode }, 'Precondiție: regulă capturată din listă');
+  },
+);
+
+// ── List (operator) ─────────────────────────────────────────────────────────
+When(/^I list the rules as the operator$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.rulesClient.list());
 });
 
-When('the rule list is requested filtered by category {string}', async ({ api }, category: string) => {
-  api.lastResponse = await api.rules.listByCategory(category);
+When(
+  /^I list the rules filtered by category "([^"]*)"$/,
+  async ({ world }: { world: UnifiedWorld }, category: string) => {
+    setState(world, await world.api.rulesClient.listByCategory(category));
+    world.api.log.info({ category, statusCode: world.api.state.statusCode }, 'Listare reguli filtrate pe categorie');
+  },
+);
+
+When(
+  /^I list the rules matching the search text "([^"]*)"$/,
+  async ({ world }: { world: UnifiedWorld }, text: string) => {
+    setState(world, await world.api.rulesClient.listByText(text));
+    world.api.log.info({ text, statusCode: world.api.state.statusCode }, 'Listare reguli pe text liber');
+  },
+);
+
+When(/^I list the rules without authentication$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.rulesClient.list('', NO_AUTH));
 });
 
-When('the rule list is requested with the search text {string}', async ({ api }, text: string) => {
-  api.lastResponse = await api.rules.listByText(text);
+// ── Toggle (operator) ─────────────────────────────────────────────────────────
+When(
+  /^I toggle the captured rule(?: (rule\d+))? to enabled "([^"]*)"$/,
+  async ({ world }: { world: UnifiedWorld }, aliasToken: string | undefined, enabled: string) => {
+    const alias = normalizeAlias(aliasToken, RulesContext.DEFAULT_RULE_ALIAS, 'rule');
+    const res = await world.api.rulesClient.toggle(capturedRuleId(world, alias), enabled === 'true');
+    setState(world, res);
+    world.api.log.info({ alias, enabled, statusCode: res.statusCode }, 'Comutare regulă');
+  },
+);
+
+When(
+  /^I flip the captured rule(?: (rule\d+))? to its opposite state$/,
+  async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
+    const alias = normalizeAlias(aliasToken, RulesContext.DEFAULT_RULE_ALIAS, 'rule');
+    const res = await world.api.rulesClient.toggle(capturedRuleId(world, alias), !capturedRuleEnabled(world, alias));
+    setState(world, res);
+    world.api.log.info({ alias, statusCode: res.statusCode }, 'Inversare stare regulă');
+  },
+);
+
+When(
+  /^I toggle an unknown rule to enabled "([^"]*)"$/,
+  async ({ world }: { world: UnifiedWorld }, enabled: string) => {
+    setState(world, await world.api.rulesClient.toggle(UNKNOWN_RULE_ID, enabled === 'true'));
+  },
+);
+
+When(
+  /^I update the captured rule(?: (rule\d+))? with the body "([^"]*)"$/,
+  async ({ world }: { world: UnifiedWorld }, aliasToken: string | undefined, body: string) => {
+    const alias = normalizeAlias(aliasToken, RulesContext.DEFAULT_RULE_ALIAS, 'rule');
+    setState(world, await world.api.rulesClient.updateRaw(capturedRuleId(world, alias), JSON.parse(body)));
+  },
+);
+
+When(
+  /^I toggle the captured rule(?: (rule\d+))? without authentication$/,
+  async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
+    const alias = normalizeAlias(aliasToken, RulesContext.DEFAULT_RULE_ALIAS, 'rule');
+    setState(world, await world.api.rulesClient.toggle(capturedRuleId(world, alias), false, NO_AUTH));
+  },
+);
+
+// ── Aserții specifice domeniului ──────────────────────────────────────────────
+Then(/^the rules response contains a list of rules$/, async ({ world }: { world: UnifiedWorld }) => {
+  const rules = ruleListFrom(world.api.state.body);
+  expect(Array.isArray(rules), `aștept un tablou de reguli, am: ${JSON.stringify(world.api.state.body)}`).toBe(true);
 });
 
-When('the rule list is requested without authentication', async ({ api, env }) => {
-  const anonymous = new RulesClient(env.apiBaseUrl);
-  api.lastResponse = await anonymous.list();
-});
+Then(
+  /^every returned rule has category "([^"]*)"$/,
+  async ({ world }: { world: UnifiedWorld }, category: string) => {
+    const rules = ruleListFrom(world.api.state.body);
+    const offending = rules.filter((r) => r.category !== category);
+    expect(offending.length, `aștept ca toate regulile să aibă categoria „${category}"`).toBe(0);
+  },
+);
 
-Then('the rule list payload is an array', async ({ api }) => {
-  const rules = ruleListFrom(api.lastResponse!.body);
-  if (!Array.isArray(rules)) throw new Error('expected the rule list payload to be an array');
-});
-
-Then('every returned rule has category {string}', async ({ api }, category: string) => {
-  const rules = ruleListFrom(api.lastResponse!.body);
-  const offending = rules.filter((r) => r.category !== category);
-  if (offending.length > 0) {
-    throw new Error(`expected every rule to have category "${category}", found ${offending.length} other(s)`);
-  }
-});
-
-// ---------------------------------------------------------------------------
-// Shared prerequisite: capture a real rule id from the list
-// ---------------------------------------------------------------------------
-
-Given('an existing rule id is captured from the rule list', async ({ api }) => {
-  const res = await api.rules.list();
-  expectStatus(res, 200);
-  const rules = ruleListFrom(res.body);
-  if (rules.length === 0) throw new Error('no rules available to capture an id from');
-  const rule = rules[0];
-  api.context.set('ruleId', rule.ruleId);
-  api.context.set('ruleEnabled', rule.enabled === true);
-});
-
-// ---------------------------------------------------------------------------
-// PUT /api/rules/{ruleId}
-// ---------------------------------------------------------------------------
-
-When('the captured rule is toggled to enabled {string}', async ({ api }, enabled: string) => {
-  const ruleId = api.context.get<string>('ruleId');
-  api.lastResponse = await api.rules.toggle(ruleId, enabled === 'true');
-});
-
-When('the captured rule enabled flag is flipped', async ({ api }) => {
-  const ruleId = api.context.get<string>('ruleId');
-  const current = api.context.get<boolean>('ruleEnabled');
-  api.lastResponse = await api.rules.toggle(ruleId, !current);
-});
-
-When('rule {string} is toggled to enabled {string}', async ({ api }, ruleId: string, enabled: string) => {
-  api.lastResponse = await api.rules.toggle(ruleId, enabled === 'true');
-});
-
-When('the captured rule is updated with the body {string}', async ({ api }, body: string) => {
-  const ruleId = api.context.get<string>('ruleId');
-  api.lastResponse = await api.rules.updateRaw(ruleId, JSON.parse(body));
-});
-
-When('rule {string} is toggled without authentication', async ({ api, env }, ruleId: string) => {
-  const anonymous = new RulesClient(env.apiBaseUrl);
-  api.lastResponse = await anonymous.toggle(ruleId, false);
-});
-
-Then('the returned rule reports enabled {string}', async ({ api }, enabled: string) => {
-  const data = (api.lastResponse!.body as { data?: RuleSummary })?.data;
-  const expected = enabled === 'true';
-  if (data?.enabled !== expected) {
-    throw new Error(`expected the returned rule to report enabled=${expected}, got ${String(data?.enabled)}`);
-  }
-});
+Then(
+  /^the returned rule reports enabled "([^"]*)"$/,
+  async ({ world }: { world: UnifiedWorld }, enabled: string) => {
+    const data = (world.api.state.body as ApiRuleResponse)?.data;
+    expect(data?.enabled).toBe(enabled === 'true');
+  },
+);

@@ -1,63 +1,110 @@
-import { When, Then } from '../bdd';
-import { ConsoleClient } from '../../clients/api/ConsoleClient';
+import { expect } from '@playwright/test';
+import { Given, When, Then } from 'src/steps/bdd';
+import { UnifiedWorld } from '@support/worlds/UnifiedWorld';
+import { ConsoleContext } from '@support/context/ConsoleContext';
+import { normalizeAlias } from 'src/utils/context/contextUtils';
+import { HttpResponse } from 'src/clients/http';
+import { HeaderMap } from 'src/clients/BaseClient';
+import { ApiConsoleResponse } from 'src/schemas/zod/console';
 
-/**
- * Console domain steps (server-side, pre-computed views for the operator).
- * Phrases are prefixed with the "console" noun so they never collide with other domains.
- */
+// ==============================================================================
+// CONSOLE — vizualizări pre-calculate pentru operator, în modelul
+// „world / state / context per domeniu". Index public + dashboard/incidents (operator).
+// ==============================================================================
 
-// --- GET /api (public hypermedia index) -------------------------------------
+// Override-uri de headere pentru cazurile negative (forțează 401 fără Bearer-ul de operator).
+const NO_AUTH: HeaderMap = { 'x-api-key': '', authorization: '' };
 
-When('the console hypermedia index is requested', async ({ api }) => {
-  api.lastResponse = await api.console.index();
-});
+/** Publică ultimul răspuns în starea partajată (cod de stare + corp). */
+function setState(world: UnifiedWorld, res: HttpResponse): void {
+  world.api.state.statusCode = res.statusCode;
+  world.api.state.body = res.body;
+}
 
-When('the console hypermedia index is requested without authentication', async ({ api, env }) => {
-  api.lastResponse = await new ConsoleClient(env.apiBaseUrl).index();
-});
-
-Then('the console index exposes navigation links', async ({ api }) => {
-  const data = (api.lastResponse!.body as any)?.data ?? api.lastResponse!.body;
-  const links = (data as any)?.links ?? (data as any)?._links;
-  if (!links || (Array.isArray(links) ? links.length === 0 : Object.keys(links).length === 0)) {
-    throw new Error('expected the console index to expose navigation links');
-  }
-});
-
-// --- GET /api/console/dashboard (operator) ----------------------------------
-
-When('the console dashboard is requested', async ({ api }) => {
-  api.lastResponse = await api.console.dashboard();
-});
-
-When('the console dashboard is requested without authentication', async ({ api, env }) => {
-  api.lastResponse = await new ConsoleClient(env.apiBaseUrl).dashboard();
-});
-
-Then('the console dashboard payload is present', async ({ api }) => {
-  const data = (api.lastResponse!.body as any)?.data;
-  if (data === undefined || data === null) {
-    throw new Error('expected the console dashboard to return a data payload');
-  }
-});
-
-// --- GET /api/console/incidents (operator, filters) -------------------------
-
-When('the console incidents view is requested', async ({ api }) => {
-  api.lastResponse = await api.console.incidents();
-});
-
-When('the console incidents view is requested filtered by status {string}', async ({ api }, status: string) => {
-  api.lastResponse = await api.console.incidents(`?status=${encodeURIComponent(status)}`);
-});
-
+// ── Index hypermedia (public) ───────────────────────────────────────────────
 When(
-  'the console incidents view is requested filtered by severity {string}',
-  async ({ api }, severity: string) => {
-    api.lastResponse = await api.console.incidents(`?severity=${encodeURIComponent(severity)}`);
+  /^the console index is requested(?: as (console\d+))?$/,
+  async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
+    const alias = normalizeAlias(aliasToken, ConsoleContext.DEFAULT_CONSOLE_ALIAS, 'console');
+    const res = await world.api.consoleClient.index();
+    world.api.consoleCtx.setView(alias, res);
+    setState(world, res);
+    world.api.log.info({ alias, statusCode: res.statusCode }, 'Index consolă cerut');
   },
 );
 
-When('the console incidents view is requested without authentication', async ({ api, env }) => {
-  api.lastResponse = await new ConsoleClient(env.apiBaseUrl).incidents();
+When(/^the console index is requested without authentication$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.consoleClient.index(NO_AUTH));
 });
+
+// ── Dashboard (operator) ────────────────────────────────────────────────────
+When(
+  /^the console dashboard is requested(?: as (console\d+))?$/,
+  async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
+    const alias = normalizeAlias(aliasToken, ConsoleContext.DEFAULT_CONSOLE_ALIAS, 'console');
+    const res = await world.api.consoleClient.dashboard();
+    world.api.consoleCtx.setView(alias, res);
+    setState(world, res);
+    world.api.log.info({ alias, statusCode: res.statusCode }, 'Dashboard consolă cerut');
+  },
+);
+
+When(/^the console dashboard is requested without authentication$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.consoleClient.dashboard(NO_AUTH));
+});
+
+// ── Incidents (operator, cu filtre) ─────────────────────────────────────────
+When(/^the console incidents view is requested$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.consoleClient.incidents());
+});
+
+When(
+  /^the console incidents view is requested filtered by status "([^"]*)"$/,
+  async ({ world }: { world: UnifiedWorld }, status: string) => {
+    setState(world, await world.api.consoleClient.incidents(`?status=${encodeURIComponent(status)}`));
+  },
+);
+
+When(
+  /^the console incidents view is requested filtered by severity "([^"]*)"$/,
+  async ({ world }: { world: UnifiedWorld }, severity: string) => {
+    setState(world, await world.api.consoleClient.incidents(`?severity=${encodeURIComponent(severity)}`));
+  },
+);
+
+When(/^the console incidents view is requested without authentication$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.consoleClient.incidents('', NO_AUTH));
+});
+
+When(
+  /^the console incidents view is requested filtered by status "([^"]*)" without authentication$/,
+  async ({ world }: { world: UnifiedWorld }, status: string) => {
+    setState(world, await world.api.consoleClient.incidents(`?status=${encodeURIComponent(status)}`, NO_AUTH));
+  },
+);
+
+// ── Aserții specifice domeniului ────────────────────────────────────────────
+Then(/^the console index exposes navigation links$/, async ({ world }: { world: UnifiedWorld }) => {
+  const body = world.api.state.body as ApiConsoleResponse;
+  const data = (body.data ?? body) as Record<string, unknown>;
+  const links = (data.links ?? data._links) as unknown;
+  const count = Array.isArray(links) ? links.length : links ? Object.keys(links as object).length : 0;
+  expect(count, `aștept linkuri de navigare în index, am: ${JSON.stringify(body)}`).toBeGreaterThan(0);
+});
+
+Then(/^the console dashboard payload is present$/, async ({ world }: { world: UnifiedWorld }) => {
+  const body = world.api.state.body as ApiConsoleResponse;
+  expect(body.data, `aștept un payload în data pentru dashboard, am: ${JSON.stringify(body)}`).not.toBeUndefined();
+  expect(body.data).not.toBeNull();
+});
+
+// Precondiție de înlănțuire opțională: o vizualizare a fost deja cerută pentru un alias.
+Given(
+  /^the console dashboard has been requested(?: as (console\d+))?$/,
+  async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
+    const alias = normalizeAlias(aliasToken, ConsoleContext.DEFAULT_CONSOLE_ALIAS, 'console');
+    const res = await world.api.consoleClient.dashboard();
+    world.api.consoleCtx.setView(alias, res);
+    world.api.log.info({ alias, statusCode: res.statusCode }, 'Precondiție: dashboard consolă cerut');
+  },
+);

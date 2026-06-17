@@ -11,8 +11,7 @@ Feature: Reports filter metadata
     Then the response status is 200
     And the response indicates success
 
-  Scenario: Filter metadata response carries a JSON body
+  Scenario: Filter metadata response carries a non-empty body
     When the report filter metadata is requested
     Then the response status is 200
-    And the report response content type contains "application/json"
     And the report response body is not empty

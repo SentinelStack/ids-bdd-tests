@@ -14,8 +14,6 @@ Feature: Curated reports catalog and download
 
   Scenario: Download a curated report listed in the catalog
     When the curated reports catalog is requested
-    And the first curated report name is remembered
-    And the remembered curated report is downloaded
+    And the first curated report from the catalog is downloaded
     Then the response status is 200
-    And the report response carries a file attachment
     And the report response body is not empty

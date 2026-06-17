@@ -1,5 +1,5 @@
-import { shortId } from './idGenerator';
-import { nowIso } from './timestampGenerator';
+import { shortId } from 'src/data/generators/idGenerator';
+import { nowIso } from 'src/data/generators/timestampGenerator';
 /** Construiește o alertă reprezentativă (de pildă o scanare de porturi). */
 export function newAlert(overrides: Record<string, unknown> = {}) {
   return {

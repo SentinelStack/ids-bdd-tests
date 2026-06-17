@@ -1,9 +1,11 @@
 @api @devices
-Feature: Report device heartbeats
-  A registered edge device periodically reports CPU/memory health to the platform.
+Feature: Edge device heartbeat
+  A registered device periodically reports CPU/RAM so the console can show it online.
 
-  Scenario: A registered device reports a valid heartbeat
-    Given a device is registered
-    When a heartbeat is sent for the registered device
+  Background:
+    Given a device has been registered
+
+  Scenario: A heartbeat for a registered device is accepted
+    When I send a heartbeat for the registered device
     Then the response status is 200
     And the response indicates success

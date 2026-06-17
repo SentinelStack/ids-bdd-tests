@@ -13,3 +13,9 @@ Feature: Console dashboard view
     When the console dashboard is requested
     Then the response status is 200
     And the console dashboard payload is present
+
+  Scenario: A previously requested dashboard can be requested again under an alias
+    Given the console dashboard has been requested as console2
+    When the console dashboard is requested as console2
+    Then the response status is 200
+    And the response indicates success

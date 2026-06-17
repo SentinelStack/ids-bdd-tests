@@ -17,6 +17,11 @@ Feature: Authenticated account view and profile updates
     Then the response status is 200
     And the response indicates success
 
+  Scenario: Updating the profile to a fresh random full name succeeds
+    When the operator updates the profile to a fresh random full name
+    Then the response status is 200
+    And the response indicates success
+
   Scenario: Updating the profile email to a valid address succeeds
     When the operator updates the profile email to "george.lupu@aegis.local"
     Then the response status is 200

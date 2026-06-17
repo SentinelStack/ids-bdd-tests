@@ -1,15 +1,17 @@
-import { Given } from '../bdd';
-import { totpCode } from '../../utils/auth/totp';
+import { Given } from 'src/steps/bdd';
+import { UnifiedWorld } from '@support/worlds/UnifiedWorld';
+import { totpCode } from 'src/utils/auth/totp';
 
-/** Authenticate the operator via API (password, then TOTP if required) for operator-only endpoints. */
-Given('the operator is authenticated via API', async ({ api }) => {
+/** Autentifică operatorul (parolă, apoi TOTP dacă e cerut) pentru endpoint-urile de operator. */
+Given('the operator is authenticated via API', async ({ world }: { world: UnifiedWorld }) => {
+  const api = world.api;
   const { username, password, totpSecret } = api.env.operator;
-  let res = await api.account.login(username, password);
+  let res = await api.accountClient.login(username, password);
   let data = (res.body as any)?.data ?? {};
   if (data.mfaToken) {
-    res = await api.account.loginMfa(data.mfaToken, totpCode(totpSecret));
+    res = await api.accountClient.loginMfa(data.mfaToken, totpCode(totpSecret));
     data = (res.body as any)?.data ?? {};
   }
-  if (!data.token) throw new Error('operator API authentication failed');
+  if (!data.token) throw new Error('autentificarea operatorului prin API a eșuat');
   api.authenticateOperator(data.token);
 });

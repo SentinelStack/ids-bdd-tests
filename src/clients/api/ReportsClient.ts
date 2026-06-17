@@ -1,12 +1,14 @@
-import { BaseClient } from '../BaseClient';
-/** Serviciul de export (rutat de nginx pe /api/reports/). */
+import { BaseClient, HeaderMap } from 'src/clients/BaseClient';
+
+/** Serviciul de export (rutat de nginx pe /api/reports/). Fiecare metodă acceptă un
+ *  override opțional de headere, ca pașii negativi să forțeze 401 / lipsă autentificare. */
 export class ReportsClient extends BaseClient {
-  meta() { return this.get('/api/reports/meta'); }
-  preview(query = '') { return this.get(`/api/reports/alerts/preview${query}`); }
-  download(query = '') { return this.get(`/api/reports/alerts/download${query}`); }
-  volume(query = '') { return this.get(`/api/reports/volume${query}`); }
-  curated() { return this.get('/api/reports/curated'); }
-  curatedDownload(name: string, query = '') {
-    return this.get(`/api/reports/curated/${encodeURIComponent(name)}/download${query}`);
+  meta(headers?: HeaderMap) { return this.get('/api/reports/meta', headers); }
+  preview(query = '', headers?: HeaderMap) { return this.get(`/api/reports/alerts/preview${query}`, headers); }
+  download(query = '', headers?: HeaderMap) { return this.get(`/api/reports/alerts/download${query}`, headers); }
+  volume(query = '', headers?: HeaderMap) { return this.get(`/api/reports/volume${query}`, headers); }
+  curated(headers?: HeaderMap) { return this.get('/api/reports/curated', headers); }
+  curatedDownload(name: string, query = '', headers?: HeaderMap) {
+    return this.get(`/api/reports/curated/${encodeURIComponent(name)}/download${query}`, headers);
   }
 }

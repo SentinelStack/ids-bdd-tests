@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
-import { DeviceSchema } from '../../schemas/zod/device.zod';
-import { HttpResponse } from '../../clients/http';
+import { DeviceSchema } from 'src/schemas/zod/device.zod';
+import { HttpResponse } from 'src/clients/http';
 
 export function validateDevice(res: HttpResponse<any>): void {
   const data = res.body?.data;

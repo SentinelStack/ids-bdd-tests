@@ -1,150 +1,173 @@
-import { Given, When, Then } from '../bdd';
-import { expectStatus } from '../../utils/api/assertionUtils';
-import { newAlert } from '../../data/generators/alertGenerator';
-import { AlertsClient } from '../../clients/api/AlertsClient';
+import { expect } from '@playwright/test';
+import { faker } from '@faker-js/faker';
+import { Given, When, Then } from 'src/steps/bdd';
+import { UnifiedWorld } from '@support/worlds/UnifiedWorld';
+import { AlertContext } from '@support/context/AlertContext';
+import { normalizeAlias } from 'src/utils/context/contextUtils';
+import { HttpResponse } from 'src/clients/http';
+import { HeaderMap } from 'src/clients/BaseClient';
+import { ApiAlertResponse } from 'src/schemas/zod/alerts';
 
-/**
- * Domain ALERTS steps.
- * Endpoints exercised:
- *   - POST /api/alerts                          (agent ingest)
- *   - GET  /api/alerts                          (operator list / filter / paginate)
- *   - POST /api/alerts/{alertId}/acknowledge    (operator acknowledge)
- *
- * Phrases are prefixed with the "alert" noun so they never collide with other domains.
- */
+// ==============================================================================
+// ALERTS — pași în modelul „world / state / context per domeniu"
+// ==============================================================================
 
-// ---------------------------------------------------------------------------
-// Ingestion (agent) — POST /api/alerts
-// ---------------------------------------------------------------------------
+// Override-uri de headere pentru cazurile negative (forțează 401 / cheie invalidă).
+const NO_API_KEY: HeaderMap = { 'x-api-key': '' };
+const NO_AUTH: HeaderMap = { 'x-api-key': '', authorization: '' };
+const UNKNOWN_ID = '00000000-0000-0000-0000-000000000000';
 
-/** Build a valid alert body and stash it in the context for later assertions/overrides. */
-Given('an alert payload is prepared', async ({ api }) => {
-  api.context.set('alertBody', newAlert());
-});
+/** Corp valid de alertă (de pildă o scanare de porturi), randomizat cu faker. */
+function validAlertPayload(overrides: Record<string, unknown> = {}) {
+  return {
+    alertId: `alr-${faker.string.alphanumeric(10).toLowerCase()}`,
+    type: 'PORT_SCAN_SUSPECTED',
+    severity: faker.helpers.arrayElement(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
+    protocol: faker.helpers.arrayElement(['TCP', 'UDP']),
+    sourceIp: faker.internet.ipv4(),
+    destinationIp: faker.internet.ipv4(),
+    packets: faker.number.int({ min: 100, max: 5000 }),
+    bytes: faker.number.int({ min: 10_000, max: 500_000 }),
+    timestamp: new Date().toISOString(),
+    description: 'Possible port scan detected in window',
+    ...overrides,
+  };
+}
 
-/** Replace one field of the prepared alert body with an explicit value. */
-Given('the alert field {string} is set to {string}', async ({ api }, field: string, value: string) => {
-  const body = api.context.get<Record<string, unknown>>('alertBody');
-  body[field] = value;
-  api.context.set('alertBody', body);
-});
+/** Publică ultimul răspuns în starea partajată (cod de stare + corp). */
+function setState(world: UnifiedWorld, res: HttpResponse): void {
+  world.api.state.statusCode = res.statusCode;
+  world.api.state.body = res.body;
+}
 
-/** Remove a required field from the prepared alert body (drives 400 negatives). */
-Given('the alert field {string} is omitted', async ({ api }, field: string) => {
-  const body = api.context.get<Record<string, unknown>>('alertBody');
-  delete body[field];
-  api.context.set('alertBody', body);
-});
+/** Id-ul alertei ingerate anterior pentru un alias. */
+function ingestedId(world: UnifiedWorld, alias: string): string {
+  const body = world.api.alertCtx.getIngest(alias).apiRes.body as ApiAlertResponse;
+  return body.data?.alertId ?? 'AlertIdMissing';
+}
 
-/** Agent ingests the currently prepared alert payload. */
-When('the agent ingests the prepared alert', async ({ api }) => {
-  const body = api.context.get<Record<string, unknown>>('alertBody');
-  api.lastResponse = await api.alerts.create(body);
-  const data = (api.lastResponse.body as any)?.data ?? {};
-  if (data.alertId) api.context.set('ingestedAlertId', data.alertId);
-});
-
-/** Agent ingests a fresh, fully valid alert (convenience for chaining prerequisites). */
-When('the agent ingests a new alert', async ({ api }) => {
-  api.lastResponse = await api.alerts.create(newAlert());
-  const data = (api.lastResponse.body as any)?.data ?? {};
-  if (data.alertId) api.context.set('ingestedAlertId', data.alertId);
-});
-
-/** Agent ingests an alert carrying a distinctive marker so it can be found via filters/search. */
+// ── Ingestie agent — POST /api/alerts ───────────────────────────────────────
 When(
-  'the agent ingests an alert with severity {string} protocol {string} source ip {string}',
-  async ({ api }, severity: string, protocol: string, sourceIp: string) => {
-    api.lastResponse = await api.alerts.create(newAlert({ severity, protocol, sourceIp }));
-    const data = (api.lastResponse.body as any)?.data ?? {};
-    if (data.alertId) api.context.set('ingestedAlertId', data.alertId);
+  /^the agent ingests a new alert(?: (alert\d+))?$/,
+  async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
+    const alias = normalizeAlias(aliasToken, AlertContext.DEFAULT_ALERT_ALIAS, 'alert');
+    const res = await world.api.alertsClient.create(validAlertPayload());
+    world.api.alertCtx.setIngest(alias, res);
+    setState(world, res);
+    world.api.log.info({ alias, statusCode: res.statusCode }, 'Ingestie alertă');
   },
 );
 
-/** Attempt to ingest an alert WITHOUT any authentication (bare client, no api key). */
-When('an unauthenticated agent ingests a valid alert', async ({ api, env }) => {
-  const bare = new AlertsClient(env.apiBaseUrl);
-  api.lastResponse = await bare.create(newAlert());
+When(
+  /^the agent ingests an alert with severity "([^"]*)" protocol "([^"]*)" source ip "([^"]*)"(?: (alert\d+))?$/,
+  async ({ world }: { world: UnifiedWorld }, severity: string, protocol: string, sourceIp: string, aliasToken?: string) => {
+    const alias = normalizeAlias(aliasToken, AlertContext.DEFAULT_ALERT_ALIAS, 'alert');
+    const res = await world.api.alertsClient.create(validAlertPayload({ severity, protocol, sourceIp }));
+    world.api.alertCtx.setIngest(alias, res);
+    setState(world, res);
+    world.api.log.info({ alias, severity, protocol, sourceIp, statusCode: res.statusCode }, 'Ingestie alertă marcată');
+  },
+);
+
+When(
+  /^the agent ingests an alert with the "([^"]*)" field set to "([^"]*)"$/,
+  async ({ world }: { world: UnifiedWorld }, field: string, value: string) => {
+    const res = await world.api.alertsClient.create(validAlertPayload({ [field]: value }));
+    setState(world, res);
+    world.api.log.info({ field, value, statusCode: res.statusCode }, 'Ingestie cu câmp suprascris');
+  },
+);
+
+When(
+  /^the agent ingests an alert with the "([^"]*)" field omitted$/,
+  async ({ world }: { world: UnifiedWorld }, field: string) => {
+    const payload = validAlertPayload();
+    delete (payload as Record<string, unknown>)[field];
+    const res = await world.api.alertsClient.create(payload);
+    setState(world, res);
+    world.api.log.info({ field, statusCode: res.statusCode }, 'Ingestie cu câmp lipsă');
+  },
+);
+
+When(/^the agent ingests an alert without authentication$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.alertsClient.create(validAlertPayload(), NO_AUTH));
 });
 
-// ---------------------------------------------------------------------------
-// Listing / filtering (operator) — GET /api/alerts
-// ---------------------------------------------------------------------------
-
-/** Operator requests the default (unfiltered) alert list. */
-When('the operator requests the alert list', async ({ api }) => {
-  api.lastResponse = await api.alerts.list();
+When(/^the agent ingests an alert with an invalid API key$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.alertsClient.create(validAlertPayload(), { 'x-api-key': 'not-a-real-key' }));
 });
 
-/** Operator requests the alert list with a raw query string (filters, sort, pagination, search). */
-When('the operator requests the alert list with query {string}', async ({ api }, query: string) => {
-  api.lastResponse = await api.alerts.list(query);
+// ── Listare / filtrare operator — GET /api/alerts ───────────────────────────
+When(/^the operator lists the alerts$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.alertsClient.list());
 });
 
-/** Attempt to list alerts WITHOUT authentication (bare operator-less client). */
-When('an unauthenticated operator requests the alert list', async ({ api, env }) => {
-  const bare = new AlertsClient(env.apiBaseUrl);
-  api.lastResponse = await bare.list();
+When(
+  /^the operator lists the alerts with query "([^"]*)"$/,
+  async ({ world }: { world: UnifiedWorld }, query: string) => {
+    setState(world, await world.api.alertsClient.list(query));
+    world.api.log.info({ query, statusCode: world.api.state.statusCode }, 'Listare alerte filtrată');
+  },
+);
+
+When(/^the operator lists the alerts without authentication$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.alertsClient.list('', NO_AUTH));
 });
 
-// ---------------------------------------------------------------------------
-// Acknowledge (operator) — POST /api/alerts/{alertId}/acknowledge
-// ---------------------------------------------------------------------------
+// ── Confirmare operator — POST /api/alerts/{id}/acknowledge ──────────────────
+When(
+  /^the operator acknowledges the ingested alert(?: (alert\d+))?$/,
+  async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
+    const alias = normalizeAlias(aliasToken, AlertContext.DEFAULT_ALERT_ALIAS, 'alert');
+    setState(world, await world.api.alertsClient.acknowledge(ingestedId(world, alias)));
+  },
+);
 
-/** Operator acknowledges the alert that was ingested earlier in this scenario. */
-When('the operator acknowledges the ingested alert', async ({ api }) => {
-  const alertId = api.context.get<string>('ingestedAlertId');
-  api.lastResponse = await api.alerts.acknowledge(alertId);
+When(/^the operator acknowledges an unknown alert$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.alertsClient.acknowledge(UNKNOWN_ID));
 });
 
-/** Operator acknowledges an alert id that does not exist (drives 404). */
-When('the operator acknowledges the alert id {string}', async ({ api }, alertId: string) => {
-  api.lastResponse = await api.alerts.acknowledge(alertId);
+When(
+  /^the operator acknowledges the alert id "([^"]*)"$/,
+  async ({ world }: { world: UnifiedWorld }, alertId: string) => {
+    setState(world, await world.api.alertsClient.acknowledge(alertId));
+  },
+);
+
+When(/^the operator acknowledges the ingested alert without authentication$/, async ({ world }: { world: UnifiedWorld }) => {
+  const alias = AlertContext.DEFAULT_ALERT_ALIAS;
+  setState(world, await world.api.alertsClient.acknowledge(ingestedId(world, alias), NO_AUTH));
 });
 
-/** Attempt to acknowledge an alert WITHOUT authentication. */
-When('an unauthenticated operator acknowledges the alert id {string}', async ({ api, env }, alertId: string) => {
-  const bare = new AlertsClient(env.apiBaseUrl);
-  api.lastResponse = await bare.acknowledge(alertId);
+When(/^the operator acknowledges an unknown alert without authentication$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.alertsClient.acknowledge(UNKNOWN_ID, NO_AUTH));
 });
 
-// ---------------------------------------------------------------------------
-// Domain-specific assertions
-// ---------------------------------------------------------------------------
-
-/** The ingest response should echo back a generated alert id. */
-Then('the response contains an alert id', async ({ api }) => {
-  const data = (api.lastResponse!.body as any)?.data ?? {};
-  if (!data.alertId) throw new Error(`expected an alertId in the response data, got ${api.lastResponse!.raw}`);
+// ── Aserții specifice domeniului ────────────────────────────────────────────
+Then(/^the alert response contains an alert id$/, async ({ world }: { world: UnifiedWorld }) => {
+  const body = world.api.state.body as ApiAlertResponse;
+  expect(body.data?.alertId, `aștept data.alertId, am: ${JSON.stringify(body)}`).toBeTruthy();
 });
 
-/** The list response should be a paged envelope exposing data.content as an array. */
-Then('the alert list response is paged', async ({ api }) => {
-  const data = (api.lastResponse!.body as any)?.data ?? {};
-  if (!Array.isArray(data.content)) {
-    throw new Error(`expected a paged envelope with data.content array, got ${api.lastResponse!.raw}`);
-  }
+Then(/^the alert list response is paged$/, async ({ world }: { world: UnifiedWorld }) => {
+  const content = (world.api.state.body as { data?: { content?: unknown } }).data?.content;
+  expect(Array.isArray(content), `aștept un plic paginat cu data.content tablou, am: ${JSON.stringify(world.api.state.body)}`).toBe(true);
 });
 
-/** Every returned alert in the page should match the given field/value (filter correctness). */
-Then('every listed alert has {string} equal to {string}', async ({ api }, field: string, value: string) => {
-  const content = ((api.lastResponse!.body as any)?.data?.content ?? []) as Array<Record<string, unknown>>;
-  if (content.length === 0) throw new Error('expected at least one alert in the filtered page');
-  const offenders = content.filter((a) => String(a[field]) !== value);
-  if (offenders.length > 0) {
-    throw new Error(`expected every alert's ${field} to equal "${value}", found ${offenders.length} mismatch(es)`);
-  }
-});
+Then(
+  /^every listed alert has "([^"]*)" equal to "([^"]*)"$/,
+  async ({ world }: { world: UnifiedWorld }, field: string, value: string) => {
+    const content = ((world.api.state.body as { data?: { content?: Array<Record<string, unknown>> } }).data?.content ?? []);
+    expect(content.length, 'aștept cel puțin o alertă în pagina filtrată').toBeGreaterThan(0);
+    const offenders = content.filter((a) => String(a[field]) !== value);
+    expect(offenders.length, `aștept ca fiecare ${field} să fie „${value}", am ${offenders.length} nepotriviri`).toBe(0);
+  },
+);
 
-/** The page should not exceed the requested page size. */
-Then('the alert page holds at most {int} item(s)', async ({ api }, size: number) => {
-  const content = ((api.lastResponse!.body as any)?.data?.content ?? []) as unknown[];
-  if (content.length > size) {
-    throw new Error(`expected at most ${size} alerts on the page, got ${content.length}`);
-  }
-});
-
-/** Reuse expectStatus indirectly so the import is meaningful even if a feature asserts inline. */
-Then('the alert response status equals {int}', async ({ api }, status: number) => {
-  expectStatus(api.lastResponse!, status);
-});
+Then(
+  /^the alert page holds at most (\d+) items$/,
+  async ({ world }: { world: UnifiedWorld }, size: string) => {
+    const content = ((world.api.state.body as { data?: { content?: unknown[] } }).data?.content ?? []);
+    expect(content.length, `aștept cel mult ${size} alerte pe pagină`).toBeLessThanOrEqual(Number(size));
+  },
+);

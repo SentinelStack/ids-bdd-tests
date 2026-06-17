@@ -1,5 +1,6 @@
 export interface HttpResponse<T = unknown> {
   status: number;
+  statusCode: number;
   ok: boolean;
   headers: Headers;
   body: T;
@@ -14,5 +15,5 @@ export async function httpRequest<T = unknown>(url: string, init: RequestInit = 
   if ((res.headers.get('content-type') ?? '').includes('application/json') && raw) {
     try { body = JSON.parse(raw); } catch { /* lăsăm raw */ }
   }
-  return { status: res.status, ok: res.ok, headers: res.headers, body: body as T, raw };
+  return { status: res.status, statusCode: res.status, ok: res.ok, headers: res.headers, body: body as T, raw };
 }

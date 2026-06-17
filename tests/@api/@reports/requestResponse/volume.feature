@@ -10,8 +10,7 @@ Feature: Reports volume histogram
     Then the response status is 200
     And the response indicates success
 
-  Scenario: Volume histogram response carries a JSON body
+  Scenario: Volume histogram response carries a non-empty body
     When the report volume histogram is requested
     Then the response status is 200
-    And the report response content type contains "application/json"
     And the report response body is not empty

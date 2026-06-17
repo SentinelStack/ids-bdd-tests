@@ -1,14 +1,13 @@
 import { Page } from '@playwright/test';
-import { Env } from '../env';
-import { ScenarioContext } from '../context/ScenarioContext';
-import { LoginPage } from '../../pages/console/LoginPage';
-import { DashboardPage } from '../../pages/console/DashboardPage';
-import { IncidentsPage } from '../../pages/console/IncidentsPage';
-import { RulesPage } from '../../pages/console/RulesPage';
-import { ReportsPage } from '../../pages/console/ReportsPage';
-import { SideBar } from '../../pages/console/components/SideBar';
+import { Env } from '@support/env';
+import { LoginPage } from 'src/pages/console/LoginPage';
+import { DashboardPage } from 'src/pages/console/DashboardPage';
+import { IncidentsPage } from 'src/pages/console/IncidentsPage';
+import { RulesPage } from 'src/pages/console/RulesPage';
+import { ReportsPage } from 'src/pages/console/ReportsPage';
+import { SideBar } from 'src/pages/console/components/SideBar';
 
-/** Grupează page-objects ale consolei pentru testele web. */
+/** „World"-ul web: page-objects ale consolei AEGIS IDS. */
 export class WebWorld {
   readonly login: LoginPage;
   readonly dashboard: DashboardPage;
@@ -17,7 +16,7 @@ export class WebWorld {
   readonly reports: ReportsPage;
   readonly sideBar: SideBar;
 
-  constructor(readonly page: Page, readonly env: Env, readonly context: ScenarioContext) {
+  constructor(readonly page: Page, readonly env: Env) {
     this.login = new LoginPage(page, env.webBaseUrl);
     this.dashboard = new DashboardPage(page);
     this.incidents = new IncidentsPage(page);
