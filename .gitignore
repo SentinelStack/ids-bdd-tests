@@ -13,3 +13,7 @@ certs/**/*.crt
 
 .idea/
 .DS_Store
+
+# secrete locale QA
+qa.env
+*.local.env
