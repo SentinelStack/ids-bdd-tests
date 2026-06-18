@@ -1,8 +1,8 @@
 # Git hooks
 
-Scripturile din `scripts/git-hooks/node/` impun convenții:
-- `branch-name-check.mjs` — denumirea ramurii;
+The scripts under `scripts/git-hooks/node/` enforce conventions:
+- `branch-name-check.mjs` — branch naming;
 - `commit-message-check.mjs` — Conventional Commits;
-- `pre-push-check.mjs` — typecheck + lint înainte de push.
+- `pre-push-check.mjs` — typecheck + lint before pushing.
 
-Instalare (exemplu): leagă-le din `.git/hooks` sau printr-un util ca Husky.
+Install (example): link them from `.git/hooks` or via a tool like Husky.

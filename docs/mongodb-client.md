@@ -1,4 +1,4 @@
-# Client MongoDB
+# MongoDB client
 
-`src/clients/database/MongoDbClient.ts` se conectează la baza operațională (`ids_platform`)
-pentru a pregăti/curăța date de test (dispozitive, alerte) și a verifica persistența.
+`src/clients/database/MongoDbClient.ts` connects to the operational database (`ids_platform`)
+to set up/clean up test data (devices, alerts) and assert persistence.

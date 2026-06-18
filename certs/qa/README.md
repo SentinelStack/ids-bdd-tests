@@ -1,4 +1,4 @@
-# Certificate — mediul `qa`
+# Certificates — `qa` environment
 
-Aici se pun certificatele/clientii TLS necesari pentru `qa` (dacă e cazul).
-Fișierele `.pem`/`.key`/`.crt` **nu** se comit (vezi `.gitignore`).
+Place the TLS certificates/clients needed for `qa` here (if any).
+The `.pem`/`.key`/`.crt` files are **not** committed (see `.gitignore`).

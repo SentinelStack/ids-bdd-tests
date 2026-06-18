@@ -1,4 +1,4 @@
-# Certificate — mediul `demo`
+# Certificates — `demo` environment
 
-Aici se pun certificatele/clientii TLS necesari pentru `demo` (dacă e cazul).
-Fișierele `.pem`/`.key`/`.crt` **nu** se comit (vezi `.gitignore`).
+Place the TLS certificates/clients needed for `demo` here (if any).
+The `.pem`/`.key`/`.crt` files are **not** committed (see `.gitignore`).
