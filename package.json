@@ -14,6 +14,7 @@
     "test:api": "bddgen && playwright test --grep @api",
     "test:web": "bddgen && playwright test --grep @web",
     "test:e2e": "bddgen && playwright test --grep @e2e",
+    "qa": "sh scripts/qa-all.sh",
     "test:qa": "sh scripts/qa.sh npm test",
     "test:qa:api": "sh scripts/qa.sh npm run test:api",
     "test:qa:e2e": "sh scripts/qa.sh npm run test:e2e",
