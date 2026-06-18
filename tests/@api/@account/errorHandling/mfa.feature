@@ -6,12 +6,12 @@ Feature: Two-factor login errors
   Scenario: A wrong TOTP code is rejected
     Given the operator has started a login that requires a second factor
     When the operator completes the second factor with code "000000"
-    Then the response status is 401
+    Then the response is unauthorized
 
   Scenario: An invalid challenge token is rejected
     Given the operator has started a login that requires a second factor
     When the operator completes the second factor with an invalid challenge token
-    Then the response status is 401
+    Then the response is unauthorized
 
   Scenario Outline: Malformed second-factor requests are rejected as bad requests
     When the operator completes the second factor with the body '<body>'

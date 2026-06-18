@@ -5,4 +5,4 @@ Feature: Console dashboard view — authorization
 
   Scenario: An unauthenticated client cannot retrieve the dashboard
     When the console dashboard is requested without authentication
-    Then the response status is 401
+    Then the response is unauthorized

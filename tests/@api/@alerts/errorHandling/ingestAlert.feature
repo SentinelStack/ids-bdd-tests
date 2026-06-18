@@ -6,11 +6,11 @@ Feature: Reject invalid or unauthorized alert ingestion
 
   Scenario: Ingestion without authentication is rejected
     When the agent ingests an alert without authentication
-    Then the response status is 401
+    Then the response is unauthorized
 
   Scenario: Ingestion with an invalid API key is rejected
     When the agent ingests an alert with an invalid API key
-    Then the response status is 401
+    Then the response is unauthorized
 
   Scenario Outline: Ingestion with a missing mandatory field is rejected
     When the agent ingests an alert with the "<field>" field omitted

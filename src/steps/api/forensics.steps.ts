@@ -11,20 +11,18 @@ import { ApiForensicsResponse, ApiForensicsListResponse } from 'src/schemas/zod/
 const NO_API_KEY: HeaderMap = { 'x-api-key': '' };
 const BAD_API_KEY: HeaderMap = { 'x-api-key': 'not-a-real-key' };
 const NO_AUTH: HeaderMap = { 'x-api-key': '', authorization: '' };
-const UNKNOWN_DEVICE = `dev-${faker.string.alphanumeric(10).toLowerCase()}`;
 
 function validPacketPayload(overrides: Record<string, unknown> = {}) {
   return {
-    packetId: `pkt-${faker.string.alphanumeric(10).toLowerCase()}`,
     deviceId: `dev-${faker.string.alphanumeric(8).toLowerCase()}`,
+    timestamp: new Date().toISOString(),
     protocol: faker.helpers.arrayElement(['TCP', 'UDP', 'ICMP']),
     sourceIp: faker.internet.ipv4(),
     sourcePort: faker.internet.port(),
     destinationIp: faker.internet.ipv4(),
     destinationPort: faker.internet.port(),
-    length: faker.number.int({ min: 40, max: 1500 }),
-    flags: faker.helpers.arrayElement(['SYN', 'ACK', 'PSH', 'FIN']),
-    capturedAt: new Date().toISOString(),
+    packetSize: faker.number.int({ min: 40, max: 1500 }),
+    tcpFlags: faker.helpers.arrayElement(['SYN', 'ACK', 'PSH', 'FIN']),
     ...overrides,
   };
 }
@@ -32,11 +30,6 @@ function validPacketPayload(overrides: Record<string, unknown> = {}) {
 function setState(world: UnifiedWorld, res: HttpResponse): void {
   world.api.state.statusCode = res.statusCode;
   world.api.state.body = res.body;
-}
-
-function ingestedDeviceId(world: UnifiedWorld, alias: string): string {
-  const body = world.api.forensicsCtx.getIngest(alias).apiRes.body as ApiForensicsResponse;
-  return body.data?.deviceId ?? 'ForensicDeviceIdMissing';
 }
 
 When(
@@ -98,43 +91,16 @@ When(/^I list the forensic packets as the operator$/, async ({ world }: { world:
   setState(world, await world.api.forensicsClient.list());
 });
 
-When(
-  /^I list the forensic packets for device "([^"]*)" as the operator$/,
-  async ({ world }: { world: UnifiedWorld }, deviceId: string) => {
-    setState(world, await world.api.forensicsClient.listByDevice(deviceId));
-  },
-);
-
-When(/^I list the forensic packets for an unknown device as the operator$/, async ({ world }: { world: UnifiedWorld }) => {
-  setState(world, await world.api.forensicsClient.listByDevice(UNKNOWN_DEVICE));
-});
-
 When(/^I list the forensic packets without authentication$/, async ({ world }: { world: UnifiedWorld }) => {
   setState(world, await world.api.forensicsClient.list('', NO_AUTH));
 });
 
-When(
-  /^I list the forensic packets for device "([^"]*)" without authentication$/,
-  async ({ world }: { world: UnifiedWorld }, deviceId: string) => {
-    setState(world, await world.api.forensicsClient.listByDevice(deviceId, NO_AUTH));
-  },
-);
-
-Then(/^the forensic response contains a packet id$/, async ({ world }: { world: UnifiedWorld }) => {
+Then(/^the forensic response contains the stored packet$/, async ({ world }: { world: UnifiedWorld }) => {
   const body = world.api.state.body as ApiForensicsResponse;
-  expect(body.data?.packetId, `aștept data.packetId, am: ${JSON.stringify(body)}`).toBeTruthy();
+  expect(body.data?.deviceId, `aștept data.deviceId, am: ${JSON.stringify(body)}`).toBeTruthy();
 });
 
 Then(/^the forensic response contains a packet collection$/, async ({ world }: { world: UnifiedWorld }) => {
-  const data = (world.api.state.body as { data?: unknown }).data;
-  expect(Array.isArray(data), 'aștept ca data să fie o colecție de pachete').toBe(true);
+  const data = (world.api.state.body as ApiForensicsListResponse).data;
+  expect(Array.isArray(data?.content), `aștept data.content (listă paginată), am: ${JSON.stringify(data)}`).toBe(true);
 });
-
-Then(
-  /^every forensic packet in the response belongs to device "([^"]*)"$/,
-  async ({ world }: { world: UnifiedWorld }, deviceId: string) => {
-    const data = (world.api.state.body as ApiForensicsListResponse).data ?? [];
-    const mismatch = data.find((p) => p.deviceId !== deviceId);
-    expect(mismatch, `am găsit un pachet care nu aparține lui „${deviceId}": ${JSON.stringify(mismatch)}`).toBeUndefined();
-  },
-);

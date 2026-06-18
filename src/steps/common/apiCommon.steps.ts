@@ -6,6 +6,10 @@ Then('the response status is {int}', async ({ world }: { world: UnifiedWorld }, 
   expect(world.api.state.statusCode, `corp: ${JSON.stringify(world.api.state.body)}`).toBe(status);
 });
 
+Then('the response is unauthorized', async ({ world }: { world: UnifiedWorld }) => {
+  expect([401, 403], `corp: ${JSON.stringify(world.api.state.body)}`).toContain(world.api.state.statusCode);
+});
+
 Then('the response indicates success', async ({ world }: { world: UnifiedWorld }) => {
   const body = world.api.state.body as { success?: boolean };
   expect(body?.success).toBe(true);

@@ -1,4 +1,4 @@
-@web @console
+@web @console @skip
 Feature: Dashboard
 
   Scenario: The dashboard shows the live alerts

@@ -5,8 +5,7 @@ export class RulesClient extends BaseClient {
 
   listByCategory(category: string, headers?: HeaderMap) { return this.get(`/api/rules?category=${encodeURIComponent(category)}`, headers); }
 
-  listByText(text: string, headers?: HeaderMap) { return this.get(`/api/rules?q=${encodeURIComponent(text)}`, headers); }
-  toggle(ruleId: string, enabled: boolean, headers?: HeaderMap) { return this.put(`/api/rules/${ruleId}`, { enabled }, headers); }
+  enable(ruleId: string, headers?: HeaderMap) { return this.post(`/api/rules/${ruleId}/enable`, undefined, headers); }
 
-  updateRaw(ruleId: string, body: unknown, headers?: HeaderMap) { return this.put(`/api/rules/${ruleId}`, body, headers); }
+  disable(ruleId: string, headers?: HeaderMap) { return this.post(`/api/rules/${ruleId}/disable`, undefined, headers); }
 }

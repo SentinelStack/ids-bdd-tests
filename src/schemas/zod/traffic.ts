@@ -3,9 +3,13 @@ import { apiEnvelope } from 'src/schemas/zod/common';
 
 export const TrafficStatsDataSchema = z
   .object({
-    id: z.unknown(),
+    deviceId: z.string(),
     totalPackets: z.number(),
+    tcpPackets: z.number(),
+    udpPackets: z.number(),
     totalBytes: z.number(),
+    tcpBytes: z.number(),
+    udpBytes: z.number(),
     windowSeconds: z.number(),
     timestamp: z.string(),
   })

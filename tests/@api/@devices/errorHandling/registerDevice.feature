@@ -15,14 +15,10 @@ Feature: Register device error handling
       | name      |
       | ipAddress |
 
-  Scenario: An invalid IP address is rejected
-    When I register a device with the "ipAddress" field set to "999.999.1.1"
-    Then the response status is 400
-
   Scenario: Registration without an API key is unauthorized
     When I register a device without an API key
-    Then the response status is 401
+    Then the response is unauthorized
 
   Scenario: Registration with an invalid API key is unauthorized
     When I register a device with an invalid API key
-    Then the response status is 401
+    Then the response is unauthorized

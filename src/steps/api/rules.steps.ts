@@ -57,14 +57,6 @@ When(
   },
 );
 
-When(
-  /^I list the rules matching the search text "([^"]*)"$/,
-  async ({ world }: { world: UnifiedWorld }, text: string) => {
-    setState(world, await world.api.rulesClient.listByText(text));
-    world.api.log.info({ text, statusCode: world.api.state.statusCode }, 'Listare reguli pe text liber');
-  },
-);
-
 When(/^I list the rules without authentication$/, async ({ world }: { world: UnifiedWorld }) => {
   setState(world, await world.api.rulesClient.list('', NO_AUTH));
 });
@@ -73,7 +65,10 @@ When(
   /^I toggle the captured rule(?: (rule\d+))? to enabled "([^"]*)"$/,
   async ({ world }: { world: UnifiedWorld }, aliasToken: string | undefined, enabled: string) => {
     const alias = normalizeAlias(aliasToken, RulesContext.DEFAULT_RULE_ALIAS, 'rule');
-    const res = await world.api.rulesClient.toggle(capturedRuleId(world, alias), enabled === 'true');
+    const ruleId = capturedRuleId(world, alias);
+    const res = enabled === 'true'
+      ? await world.api.rulesClient.enable(ruleId)
+      : await world.api.rulesClient.disable(ruleId);
     setState(world, res);
     world.api.log.info({ alias, enabled, statusCode: res.statusCode }, 'Comutare regulă');
   },
@@ -83,7 +78,10 @@ When(
   /^I flip the captured rule(?: (rule\d+))? to its opposite state$/,
   async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
     const alias = normalizeAlias(aliasToken, RulesContext.DEFAULT_RULE_ALIAS, 'rule');
-    const res = await world.api.rulesClient.toggle(capturedRuleId(world, alias), !capturedRuleEnabled(world, alias));
+    const ruleId = capturedRuleId(world, alias);
+    const res = capturedRuleEnabled(world, alias)
+      ? await world.api.rulesClient.disable(ruleId)
+      : await world.api.rulesClient.enable(ruleId);
     setState(world, res);
     world.api.log.info({ alias, statusCode: res.statusCode }, 'Inversare stare regulă');
   },
@@ -92,15 +90,10 @@ When(
 When(
   /^I toggle an unknown rule to enabled "([^"]*)"$/,
   async ({ world }: { world: UnifiedWorld }, enabled: string) => {
-    setState(world, await world.api.rulesClient.toggle(UNKNOWN_RULE_ID, enabled === 'true'));
-  },
-);
-
-When(
-  /^I update the captured rule(?: (rule\d+))? with the body '([^']*)'$/,
-  async ({ world }: { world: UnifiedWorld }, aliasToken: string | undefined, body: string) => {
-    const alias = normalizeAlias(aliasToken, RulesContext.DEFAULT_RULE_ALIAS, 'rule');
-    setState(world, await world.api.rulesClient.updateRaw(capturedRuleId(world, alias), JSON.parse(body)));
+    const res = enabled === 'true'
+      ? await world.api.rulesClient.enable(UNKNOWN_RULE_ID)
+      : await world.api.rulesClient.disable(UNKNOWN_RULE_ID);
+    setState(world, res);
   },
 );
 
@@ -108,7 +101,7 @@ When(
   /^I toggle the captured rule(?: (rule\d+))? without authentication$/,
   async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
     const alias = normalizeAlias(aliasToken, RulesContext.DEFAULT_RULE_ALIAS, 'rule');
-    setState(world, await world.api.rulesClient.toggle(capturedRuleId(world, alias), false, NO_AUTH));
+    setState(world, await world.api.rulesClient.disable(capturedRuleId(world, alias), NO_AUTH));
   },
 );
 

@@ -14,4 +14,4 @@ Feature: Profile update errors
 
   Scenario: Updating the profile without authentication is unauthorized
     When an unauthenticated client updates the profile email to "george.lupu@aegis.local"
-    Then the response status is 401
+    Then the response is unauthorized

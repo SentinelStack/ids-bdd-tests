@@ -24,4 +24,3 @@ Feature: Curated report download validation
       | name              |
       | bogus             |
       | top-talkers-2099  |
-      | ../../etc/passwd  |

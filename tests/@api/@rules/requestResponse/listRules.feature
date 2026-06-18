@@ -19,8 +19,8 @@ Feature: List edge detection rules
     And the response indicates success
     And every returned rule has category "DDOS"
 
-  Scenario: Filter rules by a free-text search term
-    When I list the rules matching the search text "scan"
+  Scenario: Filter rules by a port-scan detection category
+    When I list the rules filtered by category "PORT_SCAN"
     Then the response status is 200
     And the response indicates success
-    And the rules response contains a list of rules
+    And every returned rule has category "PORT_SCAN"

@@ -13,4 +13,4 @@ Feature: Device heartbeat error handling
   Scenario: A heartbeat without authentication is unauthorized
     Given a device has been registered
     When I send a heartbeat for the registered device without authentication
-    Then the response status is 401
+    Then the response is unauthorized

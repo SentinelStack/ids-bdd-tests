@@ -6,7 +6,7 @@ Feature: Sign in with Google errors
 
   Scenario: An invalid Google ID token is rejected
     When the operator signs in with Google id token "not-a-valid-google-jwt"
-    Then the response status is 401
+    Then the response is unauthorized
 
   Scenario Outline: Missing the Google ID token is a bad request
     When the operator signs in with Google using the body '<body>'

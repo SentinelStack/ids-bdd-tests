@@ -6,7 +6,7 @@ Feature: Reject invalid or unauthorized alert acknowledgement
 
   Scenario: Acknowledging without authentication is rejected
     When the operator acknowledges an unknown alert without authentication
-    Then the response status is 401
+    Then the response is unauthorized
 
   Scenario: Acknowledging an unknown alert returns not found
     Given the operator is authenticated via API

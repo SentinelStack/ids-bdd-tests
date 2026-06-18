@@ -15,7 +15,7 @@ Feature: Password change errors
 
   Scenario: Changing the password without authentication is unauthorized
     When an unauthenticated client changes the password from "AegisSOC!2026" to "FreshPass2026"
-    Then the response status is 401
+    Then the response is unauthorized
 
   @skip
   Scenario: Changing the password without 2FA enabled is a bad request

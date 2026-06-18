@@ -14,15 +14,18 @@ const UNKNOWN_ID = '00000000-0000-0000-0000-000000000000';
 
 function validAlertPayload(overrides: Record<string, unknown> = {}) {
   return {
-    alertId: `alr-${faker.string.alphanumeric(10).toLowerCase()}`,
+    deviceId: `dev-${faker.string.alphanumeric(8).toLowerCase()}`,
+    timestamp: new Date().toISOString(),
     type: 'PORT_SCAN_SUSPECTED',
     severity: faker.helpers.arrayElement(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
-    protocol: faker.helpers.arrayElement(['TCP', 'UDP']),
+    protocol: faker.helpers.arrayElement(['TCP', 'UDP', 'ICMP', 'UNKNOWN']),
     sourceIp: faker.internet.ipv4(),
     destinationIp: faker.internet.ipv4(),
-    packets: faker.number.int({ min: 100, max: 5000 }),
-    bytes: faker.number.int({ min: 10_000, max: 500_000 }),
-    timestamp: new Date().toISOString(),
+    sourcePort: faker.number.int({ min: 0, max: 65535 }),
+    destinationPort: faker.number.int({ min: 0, max: 65535 }),
+    packetCount: faker.number.int({ min: 100, max: 5000 }),
+    bytesCount: faker.number.int({ min: 10_000, max: 500_000 }),
+    windowSeconds: faker.number.int({ min: 1, max: 300 }),
     description: 'Possible port scan detected in window',
     ...overrides,
   };

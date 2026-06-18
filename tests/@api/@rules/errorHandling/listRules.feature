@@ -6,4 +6,4 @@ Feature: Listing rules error handling
 
   Scenario: Listing rules without authentication is rejected
     When I list the rules without authentication
-    Then the response status is 401
+    Then the response is unauthorized

@@ -12,16 +12,23 @@ const NO_API_KEY: HeaderMap = { 'x-api-key': '' };
 const BAD_API_KEY: HeaderMap = { 'x-api-key': 'not-a-real-key' };
 const NO_AUTH: HeaderMap = { 'x-api-key': '', authorization: '' };
 
+const KNOWN_DEVICE_ID = 'router-qa-01';
+
 function validTrafficStats(overrides: Record<string, unknown> = {}) {
-  const tcp = faker.number.int({ min: 100, max: 800 });
-  const udp = faker.number.int({ min: 50, max: 400 });
+  const tcpPackets = faker.number.int({ min: 100, max: 800 });
+  const udpPackets = faker.number.int({ min: 50, max: 400 });
+  const tcpBytes = faker.number.int({ min: 10_000, max: 3_000_000 });
+  const udpBytes = faker.number.int({ min: 5_000, max: 2_000_000 });
   return {
-    totalPackets: tcp + udp,
-    tcpPackets: tcp,
-    udpPackets: udp,
-    totalBytes: faker.number.int({ min: 10_000, max: 5_000_000 }),
-    windowSeconds: faker.helpers.arrayElement([5, 10, 30, 60]),
+    deviceId: KNOWN_DEVICE_ID,
     timestamp: new Date().toISOString(),
+    totalPackets: tcpPackets + udpPackets,
+    tcpPackets,
+    udpPackets,
+    totalBytes: tcpBytes + udpBytes,
+    tcpBytes,
+    udpBytes,
+    windowSeconds: faker.helpers.arrayElement([5, 10, 30, 60]),
     ...overrides,
   };
 }
@@ -79,38 +86,37 @@ When(/^the agent submits traffic statistics with an invalid API key$/, async ({ 
   setState(world, await world.api.trafficClient.stats(validTrafficStats(), BAD_API_KEY));
 });
 
-When(/^the operator requests the traffic overview$/, async ({ world }: { world: UnifiedWorld }) => {
-  setState(world, await world.api.trafficClient.list());
+When(/^a traffic-statistics window has been ingested for a known device$/, async ({ world }: { world: UnifiedWorld }) => {
+  const res = await world.api.trafficClient.stats(validTrafficStats({ deviceId: KNOWN_DEVICE_ID }));
+  setState(world, res);
+  world.api.log.info({ deviceId: KNOWN_DEVICE_ID, statusCode: res.statusCode }, 'Seed fereastră pentru un dispozitiv cunoscut');
 });
 
-When(
-  /^the operator requests the traffic overview for the last (\d+) seconds$/,
-  async ({ world }: { world: UnifiedWorld }, seconds: string) => {
-    const from = encodeURIComponent(new Date(Date.now() - Number(seconds) * 1000).toISOString());
-    const to = encodeURIComponent(new Date().toISOString());
-    setState(world, await world.api.trafficClient.list(`?from=${from}&to=${to}`));
-  },
-);
+When(/^the operator requests the traffic summary$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.trafficClient.summary());
+});
 
-When(
-  /^the operator requests the traffic overview with the time range "([^"]*)"$/,
-  async ({ world }: { world: UnifiedWorld }, range: string) => {
-    setState(world, await world.api.trafficClient.list(range));
-  },
-);
+When(/^the operator requests the traffic summary without authentication$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.trafficClient.summary(NO_AUTH));
+});
 
-When(/^the operator requests the traffic overview without authentication$/, async ({ world }: { world: UnifiedWorld }) => {
-  setState(world, await world.api.trafficClient.list('', NO_AUTH));
+When(/^the operator requests the traffic windows for the known device$/, async ({ world }: { world: UnifiedWorld }) => {
+  setState(world, await world.api.trafficClient.byDevice(KNOWN_DEVICE_ID, '?page=0&size=20'));
 });
 
 Then(/^the traffic response carries an identifier$/, async ({ world }: { world: UnifiedWorld }) => {
   const body = world.api.state.body as ApiTrafficStatsResponse;
-  const id = body.data?.id;
-  expect(id !== undefined && id !== null && String(id).length > 0, `aștept un id pe fereastra acceptată, am: ${JSON.stringify(body)}`).toBe(true);
+  const deviceId = body.data?.deviceId;
+  expect(deviceId !== undefined && deviceId !== null && String(deviceId).length > 0, `aștept un deviceId pe fereastra acceptată, am: ${JSON.stringify(body)}`).toBe(true);
 });
 
-Then(/^the traffic overview contains a list of windows$/, async ({ world }: { world: UnifiedWorld }) => {
-  const data = (world.api.state.body as { data?: unknown }).data;
-  const items = Array.isArray(data) ? data : (data as { items?: unknown })?.items;
-  expect(Array.isArray(items), 'aștept ca overview-ul de trafic să conțină o listă de ferestre').toBe(true);
+Then(/^the traffic summary exposes aggregate counters$/, async ({ world }: { world: UnifiedWorld }) => {
+  const data = (world.api.state.body as { data?: { totalPackets?: unknown; totalBytes?: unknown } }).data;
+  expect(typeof data?.totalPackets, `aștept un total agregat de pachete, am: ${JSON.stringify(data)}`).toBe('number');
+  expect(typeof data?.totalBytes, `aștept un total agregat de octeți, am: ${JSON.stringify(data)}`).toBe('number');
+});
+
+Then(/^the traffic windows response contains a list of windows$/, async ({ world }: { world: UnifiedWorld }) => {
+  const content = (world.api.state.body as { data?: { content?: unknown } }).data?.content;
+  expect(Array.isArray(content), 'aștept ca răspunsul pe dispozitiv să conțină o listă de ferestre în data.content').toBe(true);
 });

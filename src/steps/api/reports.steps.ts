@@ -19,10 +19,11 @@ function firstCuratedName(world: UnifiedWorld, alias: string): string {
   const data = (body as { data?: unknown }).data;
   const list = Array.isArray(data)
     ? data
-    : ((data as { reports?: unknown[]; items?: unknown[] })?.reports ?? (data as { items?: unknown[] })?.items ?? []);
+    : ((data as { content?: unknown[]; reports?: unknown[]; items?: unknown[] })?.content
+      ?? (data as { reports?: unknown[] })?.reports ?? (data as { items?: unknown[] })?.items ?? []);
   if (!Array.isArray(list) || list.length === 0) throw new Error('aștept cel puțin un raport curat în catalog');
-  const first = list[0] as string | { name?: string; id?: string };
-  const name = typeof first === 'string' ? first : (first?.name ?? first?.id);
+  const first = list[0] as string | { key?: string; name?: string; id?: string };
+  const name = typeof first === 'string' ? first : (first?.key ?? first?.name ?? first?.id);
   if (!name) throw new Error('nu pot rezolva un nume de raport curat din catalog');
   return String(name);
 }
@@ -115,7 +116,8 @@ Then(/^the report response data is a list$/, async ({ world }: { world: UnifiedW
   const data = (world.api.state.body as { data?: unknown }).data;
   const list = Array.isArray(data)
     ? data
-    : (data as { rows?: unknown; items?: unknown; reports?: unknown; buckets?: unknown })?.rows
+    : (data as { content?: unknown; rows?: unknown; items?: unknown; reports?: unknown; buckets?: unknown })?.content
+      ?? (data as { rows?: unknown })?.rows
       ?? (data as { items?: unknown })?.items
       ?? (data as { reports?: unknown })?.reports
       ?? (data as { buckets?: unknown })?.buckets;

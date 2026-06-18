@@ -25,8 +25,8 @@ Feature: Submit traffic statistics error handling (agent)
 
   Scenario: Submitting traffic statistics without an API key is unauthorized
     When the agent submits traffic statistics without an API key
-    Then the response status is 401
+    Then the response is unauthorized
 
   Scenario: Submitting traffic statistics with an invalid API key is unauthorized
     When the agent submits traffic statistics with an invalid API key
-    Then the response status is 401
+    Then the response is unauthorized

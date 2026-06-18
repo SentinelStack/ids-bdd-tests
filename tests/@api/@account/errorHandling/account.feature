@@ -4,4 +4,4 @@ Feature: Account access errors
 
   Scenario: Fetching the account without authentication is unauthorized
     When the operator account is requested without authentication
-    Then the response status is 401
+    Then the response is unauthorized

@@ -3,12 +3,16 @@ import { apiEnvelope } from 'src/schemas/zod/common';
 
 export const ForensicPacketDataSchema = z
   .object({
-    packetId: z.string(),
     deviceId: z.string(),
+    alertId: z.string().nullable(),
+    timestamp: z.string(),
     protocol: z.string(),
     sourceIp: z.string(),
     destinationIp: z.string(),
-    capturedAt: z.string(),
+    sourcePort: z.number(),
+    destinationPort: z.number(),
+    packetSize: z.number(),
+    tcpFlags: z.string().nullable(),
   })
   .partial()
   .passthrough();
@@ -16,5 +20,9 @@ export const ForensicPacketDataSchema = z
 export const ForensicsResponseSchema = apiEnvelope(ForensicPacketDataSchema);
 export type ApiForensicsResponse = z.infer<typeof ForensicsResponseSchema>;
 
-export const ForensicsListResponseSchema = apiEnvelope(z.array(ForensicPacketDataSchema));
+export const ForensicPacketPageDataSchema = z
+  .object({ content: z.array(ForensicPacketDataSchema), totalElements: z.number(), size: z.number() })
+  .partial()
+  .passthrough();
+export const ForensicsListResponseSchema = apiEnvelope(ForensicPacketPageDataSchema);
 export type ApiForensicsListResponse = z.infer<typeof ForensicsListResponseSchema>;

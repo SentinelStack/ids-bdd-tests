@@ -5,8 +5,8 @@ Feature: Console incidents view — authorization
 
   Scenario: An unauthenticated client cannot retrieve the incidents view
     When the console incidents view is requested without authentication
-    Then the response status is 401
+    Then the response is unauthorized
 
   Scenario: An unauthenticated client cannot retrieve filtered incidents
     When the console incidents view is requested filtered by status "OPEN" without authentication
-    Then the response status is 401
+    Then the response is unauthorized

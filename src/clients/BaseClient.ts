@@ -26,4 +26,9 @@ export class BaseClient {
       method: 'PUT', headers: this.headers(headers), body: body === undefined ? undefined : JSON.stringify(body),
     });
   }
+  patch<T = unknown>(path: string, body?: unknown, headers: HeaderMap = {}): Promise<HttpResponse<T>> {
+    return httpRequest<T>(this.url(path), {
+      method: 'PATCH', headers: this.headers(headers), body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  }
 }

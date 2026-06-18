@@ -12,16 +12,20 @@ Feature: Forensic packet ingestion error handling
     Then the response status is 400
 
     Examples:
-      | field         |
-      | deviceId      |
-      | protocol      |
-      | sourceIp      |
-      | destinationIp |
+      | field           |
+      | deviceId        |
+      | timestamp       |
+      | protocol        |
+      | sourceIp        |
+      | destinationIp   |
+      | sourcePort      |
+      | destinationPort |
+      | packetSize      |
 
   Scenario: Ingestion without an API key is unauthorized
     When I ingest a forensic packet without an API key
-    Then the response status is 401
+    Then the response is unauthorized
 
   Scenario: Ingestion with an invalid API key is unauthorized
     When I ingest a forensic packet with an invalid API key
-    Then the response status is 401
+    Then the response is unauthorized

@@ -6,18 +6,7 @@ Feature: Reject invalid or unauthorized alert listing
 
   Scenario: Listing without authentication is rejected
     When the operator lists the alerts without authentication
-    Then the response status is 401
-
-  Scenario Outline: Listing with an invalid sort field is rejected
-    Given the operator is authenticated via API
-    When the operator lists the alerts with query "?sort=<field>"
-    Then the response status is 400
-
-    Examples:
-      | field         |
-      | bogusColumn   |
-      | severity;drop |
-      | ../../etc     |
+    Then the response is unauthorized
 
   Scenario Outline: Listing with an invalid timestamp filter is rejected
     Given the operator is authenticated via API

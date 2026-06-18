@@ -131,7 +131,7 @@ When(
   async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
     const alias = normalizeAlias(aliasToken, DeviceContext.DEFAULT_DEVICE_ALIAS, 'device');
 
-    setState(world, await world.api.devicesClient.rulesetByQuery(registeredId(world, alias), world.api.env.agentApiKey, NO_API_KEY));
+    setState(world, await world.api.devicesClient.rulesetByQuery(registeredId(world, alias), world.api.env.agentApiKey));
   },
 );
 
@@ -198,8 +198,9 @@ Then(/^the device response contains thresholds$/, async ({ world }: { world: Uni
 });
 
 Then(/^the device response contains a list of devices$/, async ({ world }: { world: UnifiedWorld }) => {
-  const data = (world.api.state.body as { data?: unknown }).data;
-  expect(Array.isArray(data), 'aștept ca data să fie o listă de dispozitive').toBe(true);
+  const data = (world.api.state.body as { data?: { content?: unknown } }).data;
+  const list = Array.isArray(data) ? data : data?.content;
+  expect(Array.isArray(list), `aștept o listă de dispozitive (data.content), am: ${JSON.stringify(data)}`).toBe(true);
 });
 
 Then(/^the registered device has status "([^"]*)"$/, async ({ world }: { world: UnifiedWorld }, expected: string) => {

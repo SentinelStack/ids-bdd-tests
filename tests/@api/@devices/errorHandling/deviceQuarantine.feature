@@ -14,4 +14,4 @@ Feature: Quarantine error handling
   Scenario: Quarantining without authentication is unauthorized
     Given a device has been registered
     When I quarantine the registered device without authentication
-    Then the response status is 401
+    Then the response is unauthorized

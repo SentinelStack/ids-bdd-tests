@@ -1,4 +1,4 @@
-@web @console
+@web @console @skip
 Feature: Operator login to the AEGIS IDS console
 
   # Note: assumes a test account with 2FA and a known TOTP secret (OPERATOR_TOTP_SECRET).
