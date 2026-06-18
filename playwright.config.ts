@@ -11,6 +11,7 @@ export default defineConfig({
   fullyParallel: true,
   retries: process.env.CI ? 1 : 0,
   reporter: [
+    ['html', { outputFolder: 'playwright-report', open: 'never' }],
     cucumberReporter('html', { outputFile: 'reports/cucumber.html' }),
     ['list'],
   ],
