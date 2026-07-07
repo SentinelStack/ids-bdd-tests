@@ -13,9 +13,24 @@ const BAD_API_KEY: HeaderMap = { 'x-api-key': 'not-a-real-key' };
 const NO_AUTH: HeaderMap = { 'x-api-key': '', authorization: '' };
 const UNKNOWN_ID = '00000000-0000-0000-0000-000000000000';
 
-function validDevicePayload(overrides: Record<string, unknown> = {}) {
+// Deterministic per-scenario device id: repeated runs upsert the SAME handful of
+// devices instead of spraying a new `router-<random>` into the shared backend
+// every time. The `bdd-router-` prefix marks them clearly as test data.
+function bddDeviceId(world: UnifiedWorld, alias: string): string {
+  const key = `${world.scenarioTitle}:${alias}`;
+  let h = 2166136261;
+  for (let i = 0; i < key.length; i++) {
+    h ^= key.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return `bdd-router-${(h >>> 0).toString(36).padStart(7, '0').slice(-7)}`;
+}
+
+function validDevicePayload(world: UnifiedWorld, alias: string, overrides: Record<string, unknown> = {}) {
+  const id = bddDeviceId(world, alias);
   return {
-    name: `router-${faker.string.alphanumeric(8).toLowerCase()}`,
+    deviceId: id,
+    name: id,
     ipAddress: faker.internet.ipv4(),
     firmware: `${faker.number.int({ min: 19, max: 23 })}.05.${faker.number.int({ min: 0, max: 6 })}`,
     model: faker.helpers.arrayElement(['gl-mt300n', 'archer-c7', 'test-router']),
@@ -45,7 +60,7 @@ Given(
   /^a device has been registered(?: as (device\d+))?$/,
   async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
     const alias = normalizeAlias(aliasToken, DeviceContext.DEFAULT_DEVICE_ALIAS, 'device');
-    const res = await world.api.devicesClient.register(validDevicePayload());
+    const res = await world.api.devicesClient.register(validDevicePayload(world, alias));
     world.api.deviceCtx.setRegister(alias, res);
     world.api.log.info({ alias, statusCode: res.statusCode }, 'Precondiție: dispozitiv înregistrat');
   },
@@ -55,7 +70,7 @@ When(
   /^I register a new device(?: (device\d+))?$/,
   async ({ world }: { world: UnifiedWorld }, aliasToken?: string) => {
     const alias = normalizeAlias(aliasToken, DeviceContext.DEFAULT_DEVICE_ALIAS, 'device');
-    const res = await world.api.devicesClient.register(validDevicePayload());
+    const res = await world.api.devicesClient.register(validDevicePayload(world, alias));
     world.api.deviceCtx.setRegister(alias, res);
     setState(world, res);
     world.api.log.info({ alias, statusCode: res.statusCode }, 'Înregistrare dispozitiv');
@@ -65,7 +80,9 @@ When(
 When(
   /^I register a device with the "([^"]*)" field set to "([^"]*)"$/,
   async ({ world }: { world: UnifiedWorld }, field: string, value: string) => {
-    const res = await world.api.devicesClient.register(validDevicePayload({ [field]: value }));
+    const res = await world.api.devicesClient.register(
+      validDevicePayload(world, DeviceContext.DEFAULT_DEVICE_ALIAS, { [field]: value }),
+    );
     setState(world, res);
     world.api.log.info({ field, value, statusCode: res.statusCode }, 'Înregistrare cu câmp suprascris');
   },
@@ -74,7 +91,7 @@ When(
 When(
   /^I register a device with the "([^"]*)" field omitted$/,
   async ({ world }: { world: UnifiedWorld }, field: string) => {
-    const payload = validDevicePayload();
+    const payload = validDevicePayload(world, DeviceContext.DEFAULT_DEVICE_ALIAS);
     delete (payload as Record<string, unknown>)[field];
     const res = await world.api.devicesClient.register(payload);
     setState(world, res);
@@ -83,11 +100,11 @@ When(
 );
 
 When(/^I register a device without an API key$/, async ({ world }: { world: UnifiedWorld }) => {
-  setState(world, await world.api.devicesClient.register(validDevicePayload(), NO_API_KEY));
+  setState(world, await world.api.devicesClient.register(validDevicePayload(world, DeviceContext.DEFAULT_DEVICE_ALIAS), NO_API_KEY));
 });
 
 When(/^I register a device with an invalid API key$/, async ({ world }: { world: UnifiedWorld }) => {
-  setState(world, await world.api.devicesClient.register(validDevicePayload(), BAD_API_KEY));
+  setState(world, await world.api.devicesClient.register(validDevicePayload(world, DeviceContext.DEFAULT_DEVICE_ALIAS), BAD_API_KEY));
 });
 
 When(

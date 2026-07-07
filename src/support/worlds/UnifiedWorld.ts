@@ -8,6 +8,8 @@ export class UnifiedWorld {
   readonly api: ApiWorld;
   readonly web: WebWorld;
   readonly db: DbWorld;
+  /** Scenario title, used to derive stable per-scenario test data (e.g. device ids). */
+  scenarioTitle = '';
 
   constructor(readonly env: Env, page: Page) {
     this.api = new ApiWorld(env);
